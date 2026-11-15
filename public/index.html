@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planet X - SPHEREx Explorer</title>
+
+<style>
+  :root {
+    --card: rgba(255,255,255,.06);
+    --line: rgba(255,255,255,.13);
+    --text: #e8ecff;
+    --muted: #a9b5e8;
+    --cyan: #4de1ff;
+    --violet: #9b7bff;
+    --pink: #ff5fa2;
+    --gold: #ffc857;
+    --green: #5dffb0;
+    --orange: #ff9a5c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; padding: 0 18px 60px; color: var(--text);
+    font-family: "Segoe UI", system-ui, Arial, sans-serif;
+    background:
+      radial-gradient(ellipse at 15% 0%, #1d2d78 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 25%, #4a1d6e 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 100%, #0e3b55 0%, transparent 50%),
+      #070b1f;
+    background-attachment: fixed;
+  }
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  /* ---------- NAVIGATION ---------- */
+  nav {
+    position: sticky; top: 12px; z-index: 50; margin: 14px auto 0; max-width: 1100px;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 10px;
+    background: rgba(12,18,48,.65); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--line); border-radius: 999px; box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  }
+  nav a {
+    --c: var(--cyan);
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px;
+    color: #fff; text-decoration: none; font-weight: 600; font-size: 15px;
+    background: rgba(255,255,255,.06); border: 1px solid transparent;
+    transition: transform .25s, background .25s, box-shadow .25s, color .25s;
+  }
+  nav a::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  nav a:hover { background: var(--c); color: #07102b; transform: translateY(-4px) scale(1.06); box-shadow: 0 8px 24px var(--c); }
+  nav a:hover::before { background: #07102b; box-shadow: none; }
+  nav a.n1 { --c: #4de1ff; } nav a.n2 { --c: #ff9a5c; } nav a.n3 { --c: #9b7bff; }
+  nav a.n4 { --c: #5dffb0; } nav a.n5 { --c: #ffc857; } nav a.n6 { --c: #ff5fa2; }
+
+  /* ---------- HERO ---------- */
+  .hero { text-align: center; padding: 70px 10px 30px; position: relative; }
+  .planet { font-size: 64px; display: inline-block; animation: float 4s ease-in-out infinite; filter: drop-shadow(0 0 25px rgba(155,123,255,.8)); }
+  @keyframes float { 0%,100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-14px) rotate(6deg); } }
+  .hero h1 {
+    margin: 10px 0 12px; font-size: clamp(2.2rem, 6.5vw, 4.2rem); line-height: 1.1; letter-spacing: -1px;
+    background: linear-gradient(90deg, #4de1ff, #9b7bff 50%, #ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--muted); font-size: 1.15rem; max-width: 640px; margin: 0 auto 24px; line-height: 1.6; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 22px; }
+  .chip { padding: 8px 16px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 14px; color: var(--text); }
+  .chip b { color: var(--gold); }
+
+  /* ---------- BUTTONS ---------- */
+  .btn {
+    display: inline-block; padding: 13px 26px; border: none; border-radius: 999px; cursor: pointer;
+    font-size: 16px; font-weight: 700; color: #07102b; text-decoration: none; margin: 6px;
+    background: linear-gradient(135deg, #4de1ff, #9b7bff); transition: transform .2s, box-shadow .2s;
+    box-shadow: 0 6px 20px rgba(77,225,255,.35);
+  }
+  .btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 10px 28px rgba(155,123,255,.55); }
+  .btn.pink { background: linear-gradient(135deg, #ff5fa2, #ff9a5c); box-shadow: 0 6px 20px rgba(255,95,162,.35); }
+  .btn.green { background: linear-gradient(135deg, #5dffb0, #4de1ff); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+
+  /* ---------- PANELS ---------- */
+  .panel {
+    --c: var(--cyan);
+    position: relative; overflow: hidden; margin: 30px 0; padding: 30px 26px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 26px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); scroll-margin-top: 90px;
+  }
+  .panel::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: linear-gradient(90deg, var(--c), transparent); }
+  .panel h2 { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; font-size: 1.7rem; color: #fff; }
+  .panel h2 .ico { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; font-size: 24px; background: var(--c); box-shadow: 0 0 22px var(--c); }
+  .panel .sub { color: var(--muted); margin: 4px 0 18px; line-height: 1.6; }
+  .panel.p1 { --c: #4de1ff; } .panel.p2 { --c: #ff9a5c; } .panel.p3 { --c: #9b7bff; }
+  .panel.p4 { --c: #5dffb0; } .panel.p5 { --c: #ffc857; } .panel.p6 { --c: #ff5fa2; }
+  .center { text-align: center; }
+
+  /* ---------- FORM CONTROLS ---------- */
+  .controls { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-bottom: 14px; }
+  label { color: var(--muted); font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
+  select {
+    padding: 11px 16px; border-radius: 14px; font-size: 15px; color: #fff; cursor: pointer;
+    background: rgba(255,255,255,.08); border: 1px solid var(--line); outline: none; margin: 4px;
+  }
+  select:hover, select:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(77,225,255,.4); }
+  option { background: #0f1636; color: #fff; }
+  input[type=range] { accent-color: #ff9a5c; width: 320px; max-width: 90%; }
+  .status { text-align: center; color: var(--gold); margin: 12px 0; font-size: 14px; }
+
+  /* ---------- IMAGES ---------- */
+  .hero-img { display: block; max-width: 100%; width: 800px; margin: 0 auto; border-radius: 20px; box-shadow: 0 0 50px rgba(155,123,255,.35); border: 1px solid var(--line); }
+  #gallery, #compare { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; }
+  figure { margin: 0; width: 220px; background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; transition: transform .25s, box-shadow .25s; }
+  figure:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 12px 30px rgba(77,225,255,.3); }
+  figure img { width: 100%; display: block; }
+  figcaption { padding: 10px 12px; color: var(--muted); font-size: 13px; text-align: center; }
+  #compare figure { width: 380px; max-width: 100%; }
+  #motionImg { display: block; margin: 8px auto; max-width: 100%; width: 650px; border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 0 30px rgba(255,154,92,.25); }
+  #motionLabel { text-align: center; color: var(--orange); font-weight: 700; }
+
+  /* ---------- TABLE ---------- */
+  #detectedWrap { overflow-x: auto; border-radius: 16px; border: 1px solid var(--line); }
+  #detectedWrap table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  #detectedWrap th { background: rgba(93,255,176,.15); color: var(--green); padding: 10px 12px; text-align: left; }
+  #detectedWrap td { padding: 9px 12px; border-top: 1px solid var(--line); color: var(--text); }
+  #detectedWrap tr:hover td { background: rgba(255,255,255,.05); }
+  #detectedWrap tr.streak td { color: var(--orange); }
+
+  /* ---------- LINK CARDS ---------- */
+  .link-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .link-card {
+    --c: var(--cyan); display: block; text-decoration: none; color: var(--text); padding: 24px; border-radius: 20px;
+    background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); border: 1px solid var(--line);
+    transition: transform .25s, box-shadow .25s, border-color .25s;
+  }
+  .link-card:hover { transform: translateY(-6px); border-color: var(--c); box-shadow: 0 12px 34px var(--c); }
+  .link-card .big { font-size: 40px; }
+  .link-card h3 { margin: 10px 0 6px; color: var(--c); }
+  .link-card p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+
+  /* ---------- OBJECT + ARCHIVE CARDS ---------- */
+  #objects { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+  .object-card { padding: 20px; border-radius: 18px; background: linear-gradient(160deg, rgba(155,123,255,.22), rgba(77,225,255,.08)); border: 1px solid var(--line); transition: transform .25s; }
+  .object-card:hover { transform: translateY(-5px) rotate(-1deg); }
+  .object-card h3 { margin: 0 0 8px; color: var(--gold); }
+  .object-card p { margin: 4px 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  #spherex-results { margin-top: 10px; text-align: left; }
+  .observation-card { background: rgba(0,0,0,.25); padding: 18px 20px; margin: 12px 0; border-radius: 16px; border-left: 5px solid var(--gold); overflow-wrap: anywhere; }
+  .observation-card h3 { margin: 0 0 8px; color: var(--gold); }
+  .observation-card p { margin: 4px 0; color: var(--muted); font-size: 14px; }
+  .observation-card a { color: var(--cyan); font-weight: 700; display: inline-block; margin-top: 8px; }
+
+  /* ---------- ABOUT ---------- */
+  .about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; text-align: left; }
+  .about-card { --c: var(--cyan); background: rgba(0,0,0,.22); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 18px; padding: 22px; transition: transform .25s; }
+  .about-card:hover { transform: translateY(-5px); }
+  .about-card h3 { color: var(--c); margin: 0 0 10px; }
+  .about-card p { margin: 0 0 8px; color: var(--muted); line-height: 1.6; }
+  .about-card ul { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.8; }
+  .about-card:nth-child(1) { --c: #ff5fa2; } .about-card:nth-child(2) { --c: #5dffb0; } .about-card:nth-child(3) { --c: #9b7bff; }
+  .about-card:nth-child(4) { --c: #4de1ff; } .about-card:nth-child(5) { --c: #ffc857; } .about-card:nth-child(6) { --c: #4de1ff; }
+  .about-card:nth-child(7) { --c: #ff9a5c; } .about-card:nth-child(8) { --c: #9b7bff; } .about-card:nth-child(9) { --c: #5dffb0; }
+
+  footer { text-align: center; margin-top: 50px; padding: 30px; color: var(--muted); border-top: 1px solid var(--line); }
+  footer h3 { background: linear-gradient(90deg, #4de1ff, #ff5fa2); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* ---------- SCROLL REVEAL ---------- */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s, transform .7s; }
+  .reveal.show { opacity: 1; transform: none; }
+
+  /* ---------- ASSISTANT BUTTON (red, anime shake) ---------- */
+  #pxBtn {
+    position: fixed; right: 20px; bottom: 20px; height: 66px; padding: 0 28px;
+    border-radius: 33px; font-size: 19px; font-weight: bold; margin: 0; z-index: 2000;
+    background: linear-gradient(135deg, #ff3b3b, #d50000); color: #fff;
+    border: 3px solid #fff; cursor: pointer; box-shadow: 0 6px 26px rgba(255, 0, 0, .65);
+    animation: pxPopIn .7s cubic-bezier(.34, 1.56, .64, 1) both, pxShake 2.4s ease-in-out 1.2s infinite;
+  }
+  #pxBtn:hover { background: linear-gradient(135deg, #ff5a5a, #e60000); }
+  #pxBtn::after { content: ''; position: absolute; inset: -6px; border-radius: 40px; border: 3px solid rgba(255, 60, 60, .8); animation: pxRing 1.6s ease-out infinite; pointer-events: none; }
+  #pxBtn.pxOpen { animation: none; }
+  #pxBtn.pxOpen::after { display: none; }
+  @keyframes pxPopIn { 0% { transform: scale(0) rotate(-25deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+  @keyframes pxShake {
+    0%, 55%, 100% { transform: translate(0, 0) rotate(0) scale(1); }
+    58% { transform: translate(-7px, 0) rotate(-7deg) scale(1.14); }
+    62% { transform: translate(7px, -4px) rotate(7deg) scale(1.14); }
+    66% { transform: translate(-7px, 3px) rotate(-6deg) scale(1.14); }
+    70% { transform: translate(7px, -3px) rotate(6deg) scale(1.14); }
+    74% { transform: translate(-5px, 2px) rotate(-4deg) scale(1.1); }
+    78% { transform: translate(5px, -2px) rotate(4deg) scale(1.1); }
+    82% { transform: translate(-3px, 0) rotate(-2deg) scale(1.06); }
+    86% { transform: translate(0, 0) rotate(0) scale(1.04); }
+  }
+  @keyframes pxRing { 0% { transform: scale(.95); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
+  #pxBubble {
+    position: fixed; right: 36px; bottom: 100px; z-index: 2000; background: #fff; color: #d50000;
+    font-weight: bold; font-size: 15px; padding: 9px 16px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    animation: pxBubbleIn .5s cubic-bezier(.34, 1.56, .64, 1) 1s both, pxBubbleBob 1.2s ease-in-out 1.6s infinite; cursor: pointer;
+  }
+  #pxBubble::after { content: ''; position: absolute; bottom: -10px; right: 34px; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 12px solid #fff; }
+  @keyframes pxBubbleIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes pxBubbleBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @media (prefers-reduced-motion: reduce) {
+    #pxBtn, #pxBtn::after, #pxBubble, .planet { animation: none; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ---------- ASSISTANT WINDOW ---------- */
+  #pxBox { position: fixed; right: 20px; bottom: 100px; width: 360px; max-width: 92vw; height: 500px; background: rgba(14,20,52,.96); border: 1px solid var(--line); border-radius: 20px; display: none; flex-direction: column; z-index: 2000; text-align: left; box-shadow: 0 12px 40px rgba(0,0,0,.6); overflow: hidden; }
+  #pxHead { background: linear-gradient(135deg, #ff3b3b, #9b7bff); color: #fff; padding: 14px 16px; font-weight: bold; }
+  #pxMsgs { flex: 1; overflow-y: auto; padding: 12px; }
+  .pxm { margin: 8px 0; padding: 9px 12px; border-radius: 14px; max-width: 90%; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-line; }
+  .pxm.bot { background: rgba(255,255,255,.08); color: var(--text); }
+  .pxm.user { background: linear-gradient(135deg, #4de1ff, #9b7bff); color: #07102b; margin-left: auto; font-weight: 600; }
+  #pxChips { padding: 0 12px 6px; display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; }
+  #pxChips span { background: rgba(77,225,255,.12); color: var(--cyan); border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  #pxChips span:hover { background: rgba(77,225,255,.3); }
+  #pxForm { display: flex; border-top: 1px solid var(--line); }
+  #pxInput { flex: 1; padding: 13px; border: none; background: rgba(0,0,0,.35); color: #fff; outline: none; font-size: 14px; }
+  #pxSend { margin: 0; border: none; background: linear-gradient(135deg, #4de1ff, #9b7bff); color: #07102b; padding: 0 20px; font-size: 14px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+
+<body>
+<canvas id="stars"></canvas>
+
+<nav>
+  <a class="n1" href="/index.html#explorer">Sky Explorer</a>
+  <a class="n2" href="/index.html#moving">Moving Objects</a>
+  <a class="n3" href="/simulator.html">Planet X Simulator</a>
+  <a class="n4" href="/tracker.html">Satellite Tracker</a>
+  <a class="n5" href="/spaceweather.html">Space Weather</a>
+  <a class="n6" href="/index.html#about">About</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="planet">🪐</div>
+    <h1>Planet X &amp; SPHEREx Explorer</h1>
+    <p>Explore the infrared universe with real NASA SPHEREx observations, hunt for moving objects, and test what a hidden ninth planet could do.</p>
+    <a class="btn" href="/index.html#explorer">🔭 Start Exploring</a>
+    <a class="btn pink" href="/simulator.html">🪐 Try the Simulator</a>
+    <div class="chips">
+      <span class="chip"><b>5</b> modules</span>
+      <span class="chip"><b>6</b> infrared bands</span>
+      <span class="chip"><b>4</b> sky regions</span>
+      <span class="chip">Live NASA data</span>
+    </div>
+  </section>
+
+  <section class="panel p3 reveal">
+    <h2><span class="ico">🌠</span> NASA SPHEREx First Images</h2>
+    <p class="sub">The first light images from NASA's infrared sky-mapping telescope.</p>
+    <img class="hero-img" src="/images/spherex.jpg" alt="NASA SPHEREx Image">
+  </section>
+
+  <!-- MODULE 1 -->
+  <section class="panel p1 reveal" id="explorer">
+    <h2><span class="ico">🔭</span> Sky Explorer</h2>
+    <p class="sub">Pick a region of the sky and an infrared band to see real SPHEREx observations.</p>
+    <div class="controls">
+      <label>🌍 Region <select id="regionSel"></select></label>
+      <label> 🌠Band <select id="bandFilter"><option value="all">All bands</option></select></label>
+    </div>
+    <div class="status" id="galleryStatus">Loading observations...</div>
+    <div id="gallery"></div>
+  </section>
+
+  <section class="panel p1 reveal">
+    <h2><span class="ico">🆚</span> Compare Two Observations</h2>
+    <p class="sub">Put two observations side by side to compare bands and dates.</p>
+    <div class="controls">
+      <select id="cmpA"></select>
+      <select id="cmpB"></select>
+    </div>
+    <div id="compare"></div>
+  </section>
+
+  <!-- MODULE 2 -->
+  <section class="panel p2 reveal" id="moving">
+    <h2><span class="ico">☄️</span> Moving Object Detection</h2>
+    <p class="sub">Red circles mark objects that changed between two observations. Orange circles mark long, thin streaks that look like satellite trails.</p>
+    <img id="motionImg" src="/images/motion_1_2.jpg" alt="Moving object detection">
+    <div class="center">
+      <input type="range" id="motionSlider" min="1" max="9" value="1">
+      <p id="motionLabel">Observation 1 → 2</p>
+    </div>
+  </section>
+
+  <section class="panel p4 reveal">
+    <h2><span class="ico">📋</span> Detected Moving Objects</h2>
+    <p class="sub">Every detection found by the AI moving object detector.</p>
+    <div class="controls">
+      <label>Show
+        <select id="detFilter">
+          <option value="all">All detections</option>
+          <option value="satellite streak">Satellite streaks only</option>
+          <option value="moving object">Moving objects only</option>
+        </select>
+      </label>
+    </div>
+    <div class="status" id="detectedStatus">Loading detected objects...</div>
+    <div id="detectedWrap"></div>
+  </section>
+
+  <!-- MODULE 3 / 4 / 5 -->
+  <section class="panel p3 reveal">
+    <h2><span class="ico">🪐</span> Planet X Gravity Simulator</h2>
+    <p class="sub">Adjust Planet X's mass and orbit, then watch how its gravity bends the paths of distant objects. Switch to 3D, share your settings, or load live NASA JPL data.</p>
+    <div class="center"><a class="btn" href="/simulator.html">Open Simulator</a></div>
+  </section>
+
+  <section class="panel p5 reveal">
+    <h2><span class="ico">🛰️</span> More Space Tools</h2>
+    <p class="sub">Live pages built from public satellite and space weather data.</p>
+    <div class="link-grid">
+      <a class="link-card" style="--c:#5dffb0" href="/tracker.html">
+        <div class="big">🛰️</div>
+        <h3>Satellite &amp; Debris Tracker</h3>
+        <p>See satellites and space debris on a world map, coloured by altitude.</p>
+      </a>
+      <a class="link-card" style="--c:#ffc857" href="/spaceweather.html">
+        <div class="big">☀️</div>
+        <h3>Space Weather Monitor</h3>
+        <p>Live solar flares, Kp index and solar wind with a simple satellite risk rating.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="panel p6 reveal">
+    <h2><span class="ico">🌌</span> Celestial Objects</h2>
+    <p class="sub">A quick guide to the objects in this project.</p>
+    <div id="objects">Loading celestial objects...</div>
+  </section>
+
+  <section class="panel p1 reveal">
+    <h2><span class="ico">🚀</span> NASA SPHEREx Archive Data</h2>
+    <p class="sub">Observation details for the selected region.</p>
+    <div class="center"><button class="btn green" id="loadSpherex">Load NASA Observations</button></div>
+    <div class="status" id="status">Click the button to load NASA observations.</div>
+    <div id="spherex-results"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="panel p6 reveal" id="about">
+    <h2><span class="ico">ℹ️</span> About This Project</h2>
+    <p class="sub">What we built, why, and how.</p>
+    <div class="about-grid">
+
+      <div class="about-card">
+        <h3>❓ Problem Statement</h3>
+        <p>NASA's SPHEREx telescope produces huge amounts of infrared sky data in FITS files, a format that ordinary users cannot open or understand. Finding objects that move between observations by hand is slow, and the idea of a hidden "Planet X" is hard to explore without tools.</p>
+      </div>
+
+      <div class="about-card">
+        <h3>✅ What We Solved</h3>
+        <ul>
+          <li>Converted raw FITS data into images anyone can view</li>
+          <li>Built a web explorer for regions, bands and dates</li>
+          <li>Automatically detected objects that change between observations</li>
+          <li>Built a gravity simulator to test how a Planet X could affect distant objects</li>
+          <li>Added a satellite tracker, a space weather monitor and an AI assistant</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>🪐 What is Planet X?</h3>
+        <p>Planet X (also called Planet Nine) is a hypothetical planet far beyond Neptune. It was proposed because some distant objects, like Sedna, have orbits that look pulled in the same direction.</p>
+        <p><b>It has not been confirmed.</b> Our simulator is a scientific model, not proof that Planet X exists.</p>
+      </div>
+
+      <div class="about-card">
+        <h3>🖥️ Frontend</h3>
+        <ul>
+          <li>HTML, CSS and JavaScript</li>
+          <li>Canvas for the 2D simulator</li>
+          <li>Three.js for the 3D view</li>
+          <li>Responsive dark space theme</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>⚙️ Backend</h3>
+        <ul>
+          <li>Node.js with Express (server.js)</li>
+          <li>csv-parse to read NASA archive responses</li>
+          <li>Python for image processing: astropy, numpy, matplotlib, scipy, reproject</li>
+          <li>Data: NASA IRSA (SPHEREx), NASA JPL, CelesTrak, NOAA</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>🔭 Sky Explorer &amp; Compare</h3>
+        <ul>
+          <li>Real NASA SPHEREx images</li>
+          <li>Choose a sky region and infrared band</li>
+          <li>Compare two observations side by side with their dates</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>☄️ Moving Objects</h3>
+        <ul>
+          <li>Image differencing between two observations</li>
+          <li>Red circles for moving objects, orange for satellite streaks</li>
+          <li>Slider to step through observation pairs</li>
+          <li>Detected Moving Objects table with a filter</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>🪐 Gravity Simulator</h3>
+        <ul>
+          <li>Adjust Planet X mass, semi-major axis, eccentricity and speed</li>
+          <li>Pause and Reset buttons</li>
+          <li>Copy share link to save and share your settings</li>
+          <li>Show 3D view with inclination</li>
+          <li>Update from NASA JPL for live orbit data</li>
+          <li>Comparison with observed bodies: orbits with and without Planet X</li>
+        </ul>
+      </div>
+
+      <div class="about-card">
+        <h3>🛰️ More Modules</h3>
+        <ul>
+          <li>Satellite and debris tracker (positions from public orbit data)</li>
+          <li>Space weather monitor (live NOAA data)</li>
+          <li>AI assistant that answers questions about the project</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <h3>Planet X - AI Powered SPHEREx Sky Explorer</h3>
+    <p>Exploring the universe through infrared astronomy.</p>
+    <p>Data Source: NASA SPHEREx / IRSA</p>
+  </footer>
+
+</div>
+
+<!-- ---------- ASSISTANT WINDOW ---------- -->
+<div id="pxBubble">Ask me! 👋</div>
+<button id="pxBtn" title="Ask the Planet X assistant">💬 Ask AI Assistant</button>
+<div id="pxBox">
+  <div id="pxHead">🤖 Planet X Assistant</div>
+  <div id="pxMsgs"></div>
+  <div id="pxChips"></div>
+  <div id="pxForm">
+    <input id="pxInput" placeholder="Ask about any module..." autocomplete="off">
+    <button id="pxSend">Send</button>
+  </div>
+</div>
+
+<script>
+  // ---------- STARFIELD BACKGROUND ----------
+  (function () {
+    const c = document.getElementById('stars');
+    const ctx = c.getContext('2d');
+    let stars = [];
+    function resize() {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+      stars = [];
+      const n = Math.floor((c.width * c.height) / 9000);
+      for (let i = 0; i < n; i++) {
+        stars.push({ x: Math.random() * c.width, y: Math.random() * c.height, r: Math.random() * 1.6 + 0.3, s: Math.random() * 2 + 0.5, p: Math.random() * 6 });
+      }
+    }
+    function draw(t) {
+      ctx.clearRect(0, 0, c.width, c.height);
+      stars.forEach(s => {
+        const a = 0.35 + 0.65 * Math.abs(Math.sin(t / 1000 * s.s + s.p));
+        ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, 6.2832);
+        ctx.fill();
+      });
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      draw(0);
+    } else {
+      (function loop(t) { draw(t); requestAnimationFrame(loop); })(0);
+    }
+  })();
+
+  // ---------- SCROLL REVEAL ----------
+  (function () {
+    const items = document.querySelectorAll('.reveal');
+    try {
+      const io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('show'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.08 });
+      items.forEach(function (el) { io.observe(el); });
+    } catch (err) {
+      items.forEach(function (el) { el.classList.add('show'); });
+    }
+  })();
+
+  // ---------- MOTION SLIDER ----------
+  const mSlider = document.getElementById('motionSlider');
+  mSlider.addEventListener('input', () => {
+    const a = Number(mSlider.value);
+    document.getElementById('motionImg').src = '/images/motion_' + a + '_' + (a + 1) + '.jpg';
+    document.getElementById('motionLabel').textContent = 'Observation ' + a + ' → ' + (a + 1);
+  });
+
+  // ---------- REGIONS ----------
+  const REGIONS = {
+    vela: { name: 'Vela region (default)',  ra: 127.69444, dec: -39.1776, n: 10, folder: '/images/' },
+    m101: { name: 'Pinwheel Galaxy (M101)', ra: 210.80,    dec: 54.35,    n: 6,  folder: '/images/m101/' },
+    m42:  { name: 'Orion Nebula (M42)',     ra: 83.82,     dec: -5.39,    n: 6,  folder: '/images/m42/' },
+    m31:  { name: 'Andromeda Galaxy (M31)', ra: 10.68,     dec: 41.27,    n: 6,  folder: '/images/m31/' }
+  };
+
+  const regionSel = document.getElementById('regionSel');
+  const bandSel = document.getElementById('bandFilter');
+  const cmpA = document.getElementById('cmpA');
+  const cmpB = document.getElementById('cmpB');
+  const gallery = document.getElementById('gallery');
+  const compare = document.getElementById('compare');
+  const galleryStatus = document.getElementById('galleryStatus');
+
+  Object.keys(REGIONS).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = REGIONS[key].name;
+    regionSel.appendChild(opt);
+  });
+
+  let obsList = [];
+
+  function region() { return REGIONS[regionSel.value]; }
+  function apiUrl() {
+    const r = region();
+    return '/api/spherex?ra=' + r.ra + '&dec=' + r.dec + '&n=' + r.n;
+  }
+
+  // ---------- HELPERS ----------
+  function mjdToDate(mjd) {
+    const n = Number(mjd);
+    if (isNaN(n)) return mjd;
+    return new Date((n - 40587) * 86400000).toUTCString();
+  }
+  function shortDate(mjd) {
+    const n = Number(mjd);
+    return isNaN(n) ? '' : new Date((n - 40587) * 86400000).toISOString().slice(0, 10);
+  }
+  function info(i) {
+    const o = obsList[i - 1] || {};
+    return (o.energy_bandpassname || 'Unknown band') + ' | ' + shortDate(o.t_min);
+  }
+  function makeFigure(i) {
+    const fig = document.createElement('figure');
+    const img = document.createElement('img');
+    img.src = region().folder + 'spherex_converted_' + i + '.jpg';
+    img.alt = 'Observation ' + i;
+    img.onerror = () => fig.remove();
+    const cap = document.createElement('figcaption');
+    cap.textContent = 'Obs ' + i + ' | ' + info(i);
+    fig.appendChild(img);
+    fig.appendChild(cap);
+    return fig;
+  }
+
+  // ---------- RENDER ----------
+  function renderGallery() {
+    gallery.innerHTML = '';
+    for (let i = 1; i <= obsList.length; i++) {
+      const band = obsList[i - 1].energy_bandpassname;
+      if (bandSel.value === 'all' || band === bandSel.value) {
+        gallery.appendChild(makeFigure(i));
+      }
+    }
+  }
+  function renderCompare() {
+    compare.innerHTML = '';
+    if (!obsList.length) return;
+    [cmpA.value, cmpB.value].forEach(v => compare.appendChild(makeFigure(Number(v))));
+  }
+
+  async function loadRegion() {
+    galleryStatus.textContent = 'Loading observations for ' + region().name + '...';
+    gallery.innerHTML = '';
+    compare.innerHTML = '';
+    obsList = [];
+    try {
+      const r = await fetch(apiUrl());
+      const result = await r.json();
+      if (!r.ok || !result.success) throw new Error(result.message || 'Request failed');
+      obsList = result.images || [];
+    } catch (e) {
+      galleryStatus.textContent = 'Error: ' + e.message;
+      console.error(e);
+      return;
+    }
+    galleryStatus.textContent = obsList.length
+      ? obsList.length + ' observations in ' + region().name
+      : 'No observations found for this region. Try another region.';
+
+    bandSel.innerHTML = '<option value="all">All bands</option>';
+    const bands = [...new Set(obsList.map(o => o.energy_bandpassname).filter(Boolean))].sort();
+    bands.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b; opt.textContent = b;
+      bandSel.appendChild(opt);
+    });
+
+    cmpA.innerHTML = '';
+    cmpB.innerHTML = '';
+    for (let i = 1; i <= obsList.length; i++) {
+      [cmpA, cmpB].forEach(sel => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = 'Obs ' + i + ' | ' + info(i);
+        sel.appendChild(opt);
+      });
+    }
+    if (obsList.length > 1) cmpB.selectedIndex = 1;
+    renderGallery();
+    renderCompare();
+  }
+
+  regionSel.addEventListener('change', loadRegion);
+  bandSel.addEventListener('change', renderGallery);
+  cmpA.addEventListener('change', renderCompare);
+  cmpB.addEventListener('change', renderCompare);
+
+  // ---------- DETECTED MOVING OBJECTS TABLE ----------
+  let detData = [];
+  const detFilter = document.getElementById('detFilter');
+
+  function renderDetected() {
+    const status = document.getElementById('detectedStatus');
+    const wrap = document.getElementById('detectedWrap');
+    const f = detFilter.value;
+    const data = detData.filter(o => f === 'all' || o.type === f);
+    if (!data.length) {
+      wrap.innerHTML = '';
+      status.textContent = detData.length ? 'No detections match this filter.' : 'No moving objects detected.';
+      return;
+    }
+    const shown = data.slice(0, 50);
+    const cols = [...new Set(shown.flatMap(o => Object.keys(o)))];
+    const table = document.createElement('table');
+    const head = document.createElement('tr');
+    cols.forEach(c => {
+      const th = document.createElement('th');
+      th.textContent = c;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    shown.forEach(o => {
+      const tr = document.createElement('tr');
+      if (o.type === 'satellite streak') tr.className = 'streak';
+      cols.forEach(c => {
+        const td = document.createElement('td');
+        let v = o[c];
+        if (typeof v === 'number' && !Number.isInteger(v)) v = v.toFixed(2);
+        else if (v && typeof v === 'object') v = JSON.stringify(v);
+        td.textContent = (v === undefined || v === null) ? '-' : v;
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+    wrap.innerHTML = '';
+    wrap.appendChild(table);
+    const nStreaks = detData.filter(o => o.type === 'satellite streak').length;
+    status.textContent = data.length + ' detections' + (data.length > 50 ? ' (showing first 50)' : '') +
+      ' | ' + nStreaks + ' look like satellite streaks (orange rows) | from the AI moving object detector.';
+  }
+
+  async function loadDetected() {
+    const status = document.getElementById('detectedStatus');
+    try {
+      const r = await fetch('/moving_objects.json?t=' + Date.now());
+      if (!r.ok) throw new Error('moving_objects.json not found');
+      let data = await r.json();
+      if (!Array.isArray(data)) {
+        const firstArray = Object.values(data).find(Array.isArray);
+        data = firstArray || [data];
+      }
+      detData = data.map(item => (item && typeof item === 'object' && !Array.isArray(item)) ? item : { value: item });
+      renderDetected();
+    } catch (e) {
+      status.textContent = 'Could not load detected objects: ' + e.message;
+      console.error(e);
+    }
+  }
+  detFilter.addEventListener('change', renderDetected);
+
+  // ---------- CELESTIAL OBJECTS ----------
+  async function loadObjects() {
+    const container = document.getElementById('objects');
+    try {
+      const response = await fetch('/api/objects');
+      if (!response.ok) throw new Error('Unable to load objects');
+      const objects = await response.json();
+      container.innerHTML = '';
+      objects.forEach(object => {
+        const card = document.createElement('div');
+        card.className = 'object-card';
+        const heading = document.createElement('h3');
+        heading.textContent = object.name || 'Unknown';
+        const description = document.createElement('p');
+        description.textContent = object.description || 'No description available';
+        const type = document.createElement('p');
+        type.textContent = 'Type: ' + (object.type || 'Unknown');
+        card.appendChild(heading);
+        card.appendChild(description);
+        card.appendChild(type);
+        container.appendChild(card);
+      });
+    } catch (error) {
+      container.textContent = 'Unable to load celestial objects.';
+      console.error(error);
+    }
+  }
+
+  // ---------- NASA ARCHIVE CARDS ----------
+  function displayObservations(observations) {
+    const output = document.getElementById('spherex-results');
+    output.innerHTML = '';
+    if (!observations.length) {
+      output.textContent = 'No observations found.';
+      return;
+    }
+    observations.forEach((item, index) => {
+      const card = document.createElement('div');
+      card.className = 'observation-card';
+      const heading = document.createElement('h3');
+      heading.textContent = 'SPHEREx Observation ' + (index + 1);
+      card.appendChild(heading);
+      const fields = [
+        ['Band', 'energy_bandpassname'],
+        ['Instrument', 'instrument_name'],
+        ['Data Type', 'dataproduct_type'],
+        ['Observation ID', 'obs_id'],
+        ['Observation Date', 't_min']
+      ];
+      fields.forEach(([label, key]) => {
+        if (item[key]) {
+          const p = document.createElement('p');
+          p.textContent = label + ': ' + (key === 't_min' ? mjdToDate(item[key]) : item[key]);
+          card.appendChild(p);
+        }
+      });
+      const accessUrl = item.access_url || item.access_reference;
+      if (accessUrl) {
+        const link = document.createElement('a');
+        link.href = accessUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Open NASA FITS File';
+        card.appendChild(link);
+      }
+      output.appendChild(card);
+    });
+  }
+
+  async function loadSpherex() {
+    const status = document.getElementById('status');
+    const output = document.getElementById('spherex-results');
+    const button = document.getElementById('loadSpherex');
+    button.disabled = true;
+    status.textContent = 'Connecting to NASA SPHEREx archive...';
+    output.innerHTML = '';
+    try {
+      const response = await fetch(apiUrl());
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'NASA API request failed');
+      }
+      const observations = result.images || [];
+      status.textContent = observations.length + ' NASA observations received for ' + region().name + '.';
+      displayObservations(observations);
+    } catch (error) {
+      status.textContent = 'Error loading NASA data: ' + error.message;
+      console.error(error);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.getElementById('loadSpherex').addEventListener('click', loadSpherex);
+  loadObjects();
+  loadRegion();
+  loadDetected();
+</script>
+
+<script>
+// ---------- PROJECT ASSISTANT ----------
+(function () {
+  const KB = [
+    { k: ['problem statement','problem','why did you','why this project','motivation'],
+      a: "Problem: NASA's SPHEREx telescope produces huge amounts of infrared sky data in FITS files that ordinary users cannot open. Finding moving objects by hand is slow, and the Planet X idea is hard to explore without tools.\nWhat we solved: we converted FITS data into viewable images, built a web Sky Explorer, automatically detected changes between observations, and built a gravity simulator to test how a Planet X could affect distant objects." },
+    { k: ['what we solved','solved','solution','achieve','achievement'],
+      a: "We solved 4 things: (1) made raw NASA FITS data viewable in a web explorer, (2) automated detection of moving objects and satellite streaks, (3) built an interactive Planet X gravity simulator with 2D and 3D views, and (4) added a satellite tracker, a space weather monitor and this AI assistant." },
+    { k: ['frontend','front end','front-end'],
+      a: "Frontend: HTML, CSS and JavaScript, with Canvas for the 2D simulator and Three.js for the 3D view." },
+    { k: ['backend','back end','back-end','server'],
+      a: "Backend: Node.js with Express (server.js), csv-parse for NASA responses, and Python (astropy, numpy, matplotlib, scipy, reproject) for image processing. Data comes from NASA IRSA, NASA JPL, CelesTrak and NOAA." },
+
+    { k: ['hello','hi ','hey','help','what can you'],
+      a: "Hi! I can explain everything in this project: all 5 modules, the NASA data, the detection method, the simulator, the 3D view, the satellite tracker and the space weather monitor. Tap a suggestion or type a question." },
+
+    { k: ['project','overview','about','what is this','summary','purpose','whole project','everything'],
+      a: "Planet X is an AI-powered SPHEREx Sky Explorer and Gravity Simulator, extended with a satellite tracker and a space weather monitor.\nIt has 5 modules:\n1. SPHEREx Sky Explorer\n2. Moving Object Detection\n3. Planet X Gravity Simulator\n4. Simulator upgrades (3D view, NASA JPL data, share link)\n5. Satellite and debris tracker + Space weather monitor\nThe Planet X simulator is a scientific model, not proof that Planet X exists." },
+
+    { k: ['module','modules','five','5 modules','parts','list'],
+      a: "Module 1: SPHEREx Sky Explorer (regions, bands, date compare).\nModule 2: Moving Object Detection (changes between two observations, satellite streaks, detected objects table).\nModule 3: Planet X Gravity Simulator (mass, distance, orbits).\nModule 4: 3D view with inclination, live NASA JPL data, saving and sharing settings.\nModule 5: Satellite and debris tracker, and Space weather monitor." },
+
+    { k: ['module 1','first module','sky explorer','explorer'],
+      a: "Module 1 is the SPHEREx Sky Explorer. It shows real NASA SPHEREx images, lets you pick different sky regions, filter by infrared band, and compare two observations from different dates." },
+    { k: ['module 2','second module'],
+      a: "Module 2 is Moving Object Detection. It compares two SPHEREx observations of the same sky, finds spots that changed, and marks them as possible moving objects. A slider steps through each pair of observations, and a table lists every detection." },
+    { k: ['module 3','third module'],
+      a: "Module 3 is the Planet X Gravity Simulator. You set a hypothetical Planet X's mass and orbit, and it simulates how its gravity changes the orbits of distant objects like Sedna." },
+    { k: ['module 4','fourth module'],
+      a: "Module 4 upgrades the simulator with: a 3D view with inclination (Three.js), a live data update from NASA JPL, and saving and sharing simulation settings with a share link." },
+    { k: ['module 5','fifth module'],
+      a: "Module 5 adds two live-data pages: the Satellite and Space Debris Tracker (positions from public orbit data) and the Space Weather Monitor (live NOAA data with a simple satellite risk rating)." },
+
+    { k: ['spherex','mission','telescope','what is spherex'],
+      a: "SPHEREx is a NASA infrared space observatory that maps the whole sky in many wavelengths. This project uses its public data from NASA's IRSA archive at Caltech/IPAC. Each image is taken in one infrared band." },
+    { k: ['irsa','archive','sia','download','where does the data','nasa data','source of'],
+      a: "SPHEREx data comes from NASA's IRSA archive through its Simple Image Access (SIA) service, collection spherex_qr3. The Node server asks IRSA for observations at a sky position, and the FITS images are downloaded as small cutouts." },
+    { k: ['fits','convert','jpg','conversion','image convert','python','astropy'],
+      a: "FITS is the astronomy image format. A Python script uses astropy to read the IMAGE layer, replaces empty values, stretches the contrast between the 1st and 99th percentiles, applies the inferno colour map and saves a JPG for the website." },
+    { k: ['region','regions','m101','m42','m31','pinwheel','orion','andromeda','vela','sky position'],
+      a: "The Region dropdown has Vela (default), Pinwheel Galaxy M101, Orion Nebula M42 and Andromeda Galaxy M31. Choosing one asks NASA for observations at that position and shows its converted images." },
+    { k: ['band','bands','wavelength','infrared','d1','d2','d3','d4','d5','d6','detector'],
+      a: "SPHEREx observes in 6 detector bands, D1 to D6, covering about 0.75 to 5 microns. The Band dropdown filters the images by band so you can see different infrared wavelengths." },
+    { k: ['compare','comparison','side by side','two observations','different dates'],
+      a: "The Compare section shows any two observations side by side. Each label shows the band and observation date, so you can compare different dates." },
+    { k: ['mjd','date format','modified julian'],
+      a: "MJD means Modified Julian Date, the day count NASA uses. The page converts it to a normal date with (MJD - 40587) x 86400000 milliseconds." },
+
+    { k: ['moving','detect','detection','asteroid','comet','differencing','difference','red circle','circles','ai '],
+      a: "Detection steps: (1) align two observations onto the same sky grid, (2) normalise their brightness, (3) subtract them and smooth the result, (4) keep spots that change by more than 5 standard deviations, (5) mark them with circles as POSSIBLE moving objects. This is a simple differencing method, not a trained neural network." },
+    { k: ['slider','over time','movement','motion','pair'],
+      a: "The slider under Moving Object Detection shows the result for each consecutive pair of observations (1 to 2, 2 to 3, and so on), so you can see changes over time." },
+    { k: ['streak','orange','satellite streak','trail'],
+      a: "Orange circles and orange table rows mark long, thin streaks that look like satellite trails, because satellites cross the field quickly and leave a line. Red circles mark other possible moving objects like asteroids." },
+    { k: ['detected objects','table of detections','detections','filter','list of objects found'],
+      a: "The Detected Moving Objects table lists every detection found by the detector, loaded from moving_objects.json. Use the Show dropdown to see all detections, only satellite streaks, or only moving objects. It shows up to the first 50." },
+    { k: ['accurate','accuracy','noise','false','reliable','limit','limitation','limitations','honest','wrong'],
+      a: "Limits:\n- Detections are only possible movers; noise, different bands or alignment errors can cause false ones.\n- The simulator uses approximate orbits.\n- Satellite positions are calculated from public orbit data, accurate to roughly a few kilometres.\n- The space weather risk rating is a simple rule of thumb, not an official forecast.\n- Nothing here proves Planet X exists." },
+
+    { k: ['simulator','simulation','gravity','gravitational','nbody','n-body','leapfrog','physics','how does the simulator'],
+      a: "The Planet X Gravity Simulator is an N-body simulation in JavaScript using leapfrog integration. It has the Sun, a hypothetical Planet X and distant objects such as Sedna and 2012 VP113. It runs one version without Planet X (hollow dots) and one with it (solid dots with trails) so you can see how its gravity changes their orbits." },
+    { k: ['mass','semi-major','eccentricity','axis','distance','adjust','controls','sliders','earth masses'],
+      a: "You can adjust Planet X's mass (Earth masses), semi-major axis (AU), eccentricity, simulation speed, and inclination (3D view only). Buttons: Weak Planet X preset, Strong Planet X preset, Default, Reset, Pause, Copy share link, Show 3D view and Update from NASA JPL." },
+    { k: ['preset','weak','strong','default'],
+      a: "The preset buttons set quick example cases: a weak Planet X (5 Earth masses, 400 AU), a strong Planet X (15 Earth masses, 200 AU), and Default to go back to the starting values." },
+    { k: ['pause','reset'],
+      a: "Pause freezes the simulation so you can look at the orbits, and Reset puts everything back to the starting positions with the current settings." },
+    { k: ['perihelion','shift','observed orbit','observed bodies'],
+      a: "The simulator compares each distant object's orbit without Planet X and with Planet X. The shift shows how much Planet X's gravity changes it. This is how a hypothetical prediction is compared with observed bodies." },
+    { k: ['best','best-fit','fit','find planet','backwards','reverse','orbit of planet x'],
+      a: "The best-fit idea works backwards: hide a Planet X, simulate the orbit shifts it causes, then search many masses, distances and directions for the one that matches best. With real measured orbit shifts it would estimate a possible Planet X orbit. Many orbits can fit the same data, so it is not proof." },
+    { k: ['planet x','planet nine','exist','real','hypothetical','proof','evidence','does planet'],
+      a: "Planet X (also called Planet Nine) is a hypothetical planet proposed to explain odd orbits of some distant objects beyond Neptune. It is NOT confirmed. This project is a scientific model to explore the idea, not evidence that it exists." },
+    { k: ['sedna','2012 vp113','kuiper','distant object','trans-neptunian','tno'],
+      a: "Sedna and 2012 VP113 are distant objects far beyond Neptune. Their clustered orbits are one reason scientists suggest a distant massive planet. The simulator uses their orbit values." },
+
+    { k: ['3d','three.js','threejs','inclination','tilt'],
+      a: "Show 3D view switches the simulator to a 3D scene built with Three.js. The inclination slider tilts Planet X's orbit out of the flat plane (it only affects the 3D view), so you can see how a tilted orbit looks compared with the others." },
+    { k: ['jpl','live nasa','update from nasa','small-body','sbdb','live orbit'],
+      a: "The Update from NASA JPL button fetches current orbit data for the distant objects from NASA JPL and refreshes the simulation with it, so the model uses real published values instead of fixed numbers." },
+    { k: ['share','save','link','copy share','settings','share link'],
+      a: "Copy share link saves your current simulation settings (mass, semi-major axis, eccentricity and so on) into a web link. Anyone who opens that link sees the same settings." },
+
+    { k: ['satellite','debris','tracker','leo','geo','celestrak','space force','tle','orbit data','altitude'],
+      a: "The Satellite and Space Debris Tracker plots objects on a world map. Positions are calculated from public orbit data (CelesTrak / US Space Force catalog), not detected by a telescope, with accuracy of roughly a few kilometres.\nDot colours by altitude: green = below 2,000 km (LEO), yellow = 2,000 to 35,000 km, red = above 35,000 km (GEO). Pick a group, press Reload data, and click a dot to see its details." },
+    { k: ['group','reload','click a dot','selected','objects tracked'],
+      a: "Use the Group dropdown to choose which set of satellites or debris to show, and Reload data to refresh. The page shows how many objects are tracked and the time. Click a dot to select it and see its details." },
+
+    { k: ['space weather','noaa','swpc','kp','geomagnetic','solar','flare','solar wind','radio blackout','radiation','storm','risk'],
+      a: "The Space Weather Monitor shows live data from the NOAA Space Weather Prediction Center:\n- Geomagnetic storm (G), solar radiation storm (S) and radio blackout (R) scales\n- Kp index (Kp 5 or higher means a geomagnetic storm)\n- Current solar flare class from X-ray flux\n- Solar wind speed (calm is about 300 to 400 km/s)\n- Charts of Kp over 3 days and X-ray flux over 6 hours\nThe satellite risk rating (LOW / higher) is a simple rule of thumb for this demo, not an official forecast. For real warnings see swpc.noaa.gov." },
+    { k: ['why','connect','link between','related','satellites and space weather','drag'],
+      a: "Space weather affects satellites: geomagnetic storms can increase drag on low satellites and disturb GPS and radio. That is why the Satellite Tracker and Space Weather Monitor sit together in Module 5." },
+
+    { k: ['tech','technology','stack','built with','tools','node','express','javascript','html','scipy','library'],
+      a: "Backend: Node.js with Express. Frontend: HTML, CSS, JavaScript and Three.js for the 3D view. Image processing: Python (astropy, numpy, matplotlib, scipy, reproject). Data sources: NASA IRSA (SPHEREx), NASA JPL, CelesTrak and NOAA SWPC." },
+    { k: ['run','start','how to use','launch','open the'],
+      a: "Run 'node server.js' in the planet-x folder, then open http://localhost:3000. Use the navigation bar at the top to switch between Sky Explorer, Moving Objects, Planet X Simulator, Satellite Tracker, Space Weather and About." },
+    { k: ['navigation','menu','pages','nav'],
+      a: "The top navigation bar has: Sky Explorer, Moving Objects, Planet X Simulator, Satellite Tracker, Space Weather and About." },
+    { k: ['future','improve','next','extend','more'],
+      a: "Ideas for next steps: a trained machine-learning classifier for moving objects, matching detections to known asteroid catalogues, more sky regions, fitting Planet X to real orbit measurements, and satellite pass predictions for a chosen location." }
+  ];
+
+  const CHIPS = [
+    'What is the problem statement?',
+    'What did we solve?',
+    'What is Planet X?',
+    'What is the frontend?',
+    'What is the backend?',
+    'How does detection work?',
+    'How does the simulator work?',
+    'What is the 3D view?',
+    'How does the satellite tracker work?',
+    'What is Kp index?',
+    'What are the limitations?'
+  ];
+
+  const btn = document.getElementById('pxBtn');
+  const box = document.getElementById('pxBox');
+  const bubble = document.getElementById('pxBubble');
+  const msgs = document.getElementById('pxMsgs');
+  const input = document.getElementById('pxInput');
+  const chips = document.getElementById('pxChips');
+
+  function add(text, who) {
+    const d = document.createElement('div');
+    d.className = 'pxm ' + who;
+    d.textContent = text;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function answer(q) {
+    const t = ' ' + q.toLowerCase() + ' ';
+    let best = null, top = 0;
+    KB.forEach(function (item) {
+      let s = 0;
+      item.k.forEach(function (w) { if (t.includes(w)) s += w.length; });
+      if (s > top) { top = s; best = item; }
+    });
+    return best ? best.a :
+      "I'm not sure about that. Try asking about: the problem statement, what we solved, Planet X, the frontend and backend, the modules, SPHEREx data, FITS conversion, bands and regions, moving object detection, the simulator, the 3D view, NASA JPL data, the share link, the satellite tracker, space weather, or the limitations.";
+  }
+
+  function ask(q) {
+    if (!q.trim()) return;
+    add(q, 'user');
+    setTimeout(function () { add(answer(q), 'bot'); }, 250);
+  }
+
+  CHIPS.forEach(function (c) {
+    const s = document.createElement('span');
+    s.textContent = c;
+    s.onclick = function () { ask(c); };
+    chips.appendChild(s);
+  });
+
+  function toggleChat() {
+    const open = box.style.display === 'flex';
+    box.style.display = open ? 'none' : 'flex';
+    btn.classList.toggle('pxOpen', !open);
+    btn.textContent = open ? '💬 Ask AI Assistant' : '✖ Close';
+    if (bubble) bubble.style.display = 'none';
+    if (!open && !msgs.children.length) {
+      add("Hi! I'm the Planet X assistant. I know all 5 modules of this project. Ask me anything.", 'bot');
+    }
+  }
+
+  btn.onclick = toggleChat;
+  if (bubble) bubble.onclick = toggleChat;
+  document.getElementById('pxSend').onclick = function () { ask(input.value); input.value = ''; };
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { ask(input.value); input.value = ''; }
+  });
+})();
+</script>
+<script>
+(function () {
+  var s = document.createElement('style');
+  s.textContent = `
+  @keyframes pxLaunch{
+    0%{opacity:0;transform:translateY(120px) scale(.85)}
+    60%{opacity:1;transform:translateY(-14px) scale(1.02)}
+    100%{opacity:1;transform:none}}
+  @keyframes pxRocketFly{
+    from{background-position:right 18px top 70px,0 0,0 0,0 0,0 0,0 0,0 0}
+    to{background-position:right 34px top 48px,0 0,0 0,0 0,0 0,0 0,0 0}}
+  #pxBox{
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg transform='rotate(45 100 100)'%3E%3Cpath d='M100 20C120 50 120 100 112 140H88C80 100 80 50 100 20Z' fill='%23cfe8ff'/%3E%3Ccircle cx='100' cy='70' r='10' fill='%232bb6d6'/%3E%3Cpath d='M88 110L66 145L88 140Z' fill='%23ff5a36'/%3E%3Cpath d='M112 110L134 145L112 140Z' fill='%23ff5a36'/%3E%3Cpath d='M92 140L100 180L108 140Z' fill='%23ffa24c'/%3E%3C/g%3E%3C/svg%3E") no-repeat right 18px top 70px/110px,
+      radial-gradient(1.5px 1.5px at 20% 30%,#fff,transparent),
+      radial-gradient(1px 1px at 60% 20%,#fff,transparent),
+      radial-gradient(1.5px 1.5px at 80% 60%,#fff,transparent),
+      radial-gradient(1px 1px at 35% 75%,#fff,transparent),
+      radial-gradient(1px 1px at 10% 85%,#fff,transparent),
+      linear-gradient(160deg,#0b1437 0%,#1b1f5e 55%,#3a1c71 100%) !important;
+    animation:pxLaunch .6s cubic-bezier(.34,1.56,.64,1) both,
+              pxRocketFly 6s ease-in-out .6s infinite alternate !important;
+  }`;
+  document.head.appendChild(s);
+})();
+</script>
+<script>
+(function () {
+  var s = document.createElement('style');
+  s.textContent = `
+  /* rocket-style button: space colors + flying motion */
+  @keyframes pxFly{
+    0%,100%{transform:translate(0,0) rotate(-4deg)}
+    25%{transform:translate(8px,-10px) rotate(-10deg)}
+    50%{transform:translate(0,-18px) rotate(-4deg)}
+    75%{transform:translate(-8px,-8px) rotate(2deg)}}
+  #pxBtn{
+    background:linear-gradient(135deg,#4de1ff,#9b7bff) !important;
+    color:#07102b !important;
+    border:3px solid #fff !important;
+    box-shadow:0 8px 30px rgba(77,225,255,.7) !important;}
+  #pxBtn:hover{background:linear-gradient(135deg,#7aeaff,#b59cff) !important}
+  #pxBtn:not(.pxOpen){
+    animation:pxPopIn .7s cubic-bezier(.34,1.56,.64,1) both,
+              pxFly 3s ease-in-out 1s infinite !important;}
+  #pxBtn::after{border-color:rgba(77,225,255,.8) !important}
+  #pxBubble{color:#4a1d6e !important}
+
+  /* popup: space background + astronaut */
+  @keyframes pxLaunch{
+    0%{opacity:0;transform:translateY(120px) scale(.85)}
+    60%{opacity:1;transform:translateY(-14px) scale(1.02)}
+    100%{opacity:1;transform:none}}
+  @keyframes pxAstro{
+    0%{transform:scale(0) rotate(-180deg);opacity:0}
+    60%{transform:scale(1.3) rotate(15deg);opacity:1}
+    100%{transform:scale(1) rotate(0);opacity:1}}
+  @keyframes pxAstroFloat{
+    0%,100%{transform:translateY(0) rotate(-8deg)}
+    50%{transform:translateY(-8px) rotate(8deg)}}
+  #pxBox{
+    background:
+      radial-gradient(1.5px 1.5px at 20% 30%,#fff,transparent),
+      radial-gradient(1px 1px at 60% 20%,#fff,transparent),
+      radial-gradient(1.5px 1.5px at 80% 60%,#fff,transparent),
+      radial-gradient(1px 1px at 35% 75%,#fff,transparent),
+      radial-gradient(1px 1px at 10% 85%,#fff,transparent),
+      linear-gradient(160deg,#0b1437 0%,#1b1f5e 55%,#3a1c71 100%) !important;
+    animation:pxLaunch .6s cubic-bezier(.34,1.56,.64,1) both !important;}
+  #pxBox::before{
+    content:'🧑‍🚀';position:absolute;top:4px;right:14px;font-size:40px;z-index:5;
+    pointer-events:none;
+    animation:pxAstro .8s cubic-bezier(.34,1.56,.64,1) both,
+              pxAstroFloat 3s ease-in-out .8s infinite;}`;
+  document.head.appendChild(s);
+
+  /* swap the button emoji: 🚀 when closed, 🧑‍🚀 when open */
+  var btn = document.getElementById('pxBtn');
+  if (btn) {
+    var fix = function () {
+      var t = btn.textContent;
+      if (t.indexOf('💬') > -1 || t.indexOf('✖') > -1) {
+        btn.textContent = t.replace('💬', '🚀').replace('✖', '🧑‍🚀');
+      }
+    };
+    new MutationObserver(fix).observe(btn, {childList: true, characterData: true, subtree: true});
+    fix();
+  }
+})();
+</script>
+<script>
+(function () {
+  var s = document.createElement('style');
+  s.textContent = `
+  /* button: still */
+  #pxBtn, #pxBtn:not(.pxOpen){animation:none !important}
+  #pxBtn::after{display:none !important}
+  #pxBubble{animation:none !important}
+
+  /* popup: space background */
+  #pxBox{
+    animation:none !important;
+    background:
+      radial-gradient(1.5px 1.5px at 20% 30%,#fff,transparent),
+      radial-gradient(1px 1px at 60% 20%,#fff,transparent),
+      radial-gradient(1.5px 1.5px at 80% 60%,#fff,transparent),
+      radial-gradient(1px 1px at 35% 75%,#fff,transparent),
+      radial-gradient(1px 1px at 10% 85%,#fff,transparent),
+      linear-gradient(160deg,#0b1437 0%,#1b1f5e 55%,#3a1c71 100%) !important;}
+  #pxBox::before{display:none !important}
+
+  /* astronaut beside every bot message */
+  @keyframes pxAstroIn{
+    0%{transform:translate(120px,-60px) rotate(-300deg) scale(.3);opacity:0}
+    20%{opacity:1}
+    75%{transform:translate(-4px,4px) rotate(15deg) scale(1.3);opacity:1}
+    100%{transform:translate(0,0) rotate(0) scale(1);opacity:1}}
+  @keyframes pxAstroFloat{
+    0%,100%{transform:translateY(0) rotate(-8deg)}
+    50%{transform:translateY(-6px) rotate(8deg)}}
+  .pxm.bot{position:relative;max-width:80% !important;margin-right:44px !important;overflow:visible !important}
+  .pxm.bot::after{
+    content:'🧑‍🚀';position:absolute;right:-40px;bottom:-12px;font-size:32px;
+    pointer-events:none;
+    animation:pxAstroIn 1.4s cubic-bezier(.22,1,.36,1) both,
+              pxAstroFloat 3s ease-in-out 1.4s infinite;}`;
+  document.head.appendChild(s);
+
+  /* button emoji: 🚀 closed, 🧑‍🚀 on Close */
+  var btn = document.getElementById('pxBtn');
+  if (btn) {
+    var fix = function () {
+      var t = btn.textContent;
+      if (t.indexOf('💬') > -1 || t.indexOf('✖') > -1) {
+        btn.textContent = t.replace('💬', '🚀').replace('✖', '🧑‍🚀');
+      }
+    };
+    new MutationObserver(fix).observe(btn, {childList: true, characterData: true, subtree: true});
+    fix();
+  }
+})();
+</script>
+</body>
+</html>

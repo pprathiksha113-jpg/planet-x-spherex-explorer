@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Weather Monitor</title>
+<style>
+  body { margin:0; padding:20px; font-family:Arial,sans-serif; background:#080d25; color:white; text-align:center; }
+  h1 { color:#61d9ff; } h2 { color:#f5c86b; }
+  p, label { color:#d0d8ef; }
+  a { color:#61d9ff; }
+  canvas { background:#050818; border-radius:12px; max-width:100%; }
+  .banner { max-width:800px; margin:10px auto; padding:10px 14px; border:1px solid #f5c86b; border-radius:8px; background:#2a2310; color:#f5c86b; font-size:14px; }
+  #risk { max-width:600px; margin:15px auto; padding:16px; border-radius:12px; font-size:20px; font-weight:bold; background:#101b39; border:2px solid #2a3a6a; }
+  #riskWhy { font-size:14px; font-weight:normal; color:#d0d8ef; margin-top:6px; }
+  .grid { display:flex; flex-wrap:wrap; justify-content:center; gap:15px; margin:15px 0; }
+  .card { background:#172448; padding:16px 20px; border-radius:12px; width:200px; }
+  .card h3 { margin:0 0 6px; color:#61d9ff; font-size:15px; }
+  .big { font-size:34px; font-weight:bold; }
+  .small { font-size:13px; color:#d0d8ef; }
+  .alerts { max-width:800px; margin:15px auto; text-align:left; }
+  .alert { background:#101b39; border-left:4px solid #f5c86b; border-radius:8px; padding:10px 14px; margin:8px 0; font-size:14px; overflow-wrap:anywhere; }
+  .alert b { color:#f5c86b; }
+  button { background:#087cf0; color:white; padding:10px 22px; border:none; border-radius:8px; cursor:pointer; font-size:15px; margin:4px; }
+  #status { color:#f5c86b; font-size:14px; }
+</style>
+</head>
+<body>
+
+<nav style="text-align:center;padding:10px;background:#172448;border-radius:8px;margin-bottom:15px;">
+  <a href="/index.html#explorer" style="margin:0 15px;text-decoration:none;">🔭 Sky Explorer</a>
+  <a href="/index.html#moving" style="margin:0 15px;text-decoration:none;">☄️ Moving Objects</a>
+  <a href="/simulator.html" style="margin:0 15px;text-decoration:none;">🪐 Planet X Simulator</a>
+  <a href="/tracker.html" style="margin:0 15px;text-decoration:none;">🛰 Satellite Tracker</a>
+  <a href="/spaceweather.html" style="margin:0 15px;text-decoration:none;">☀️ Space Weather</a>
+</nav>
+
+<h1>☀️ Space Weather Monitor</h1>
+<div class="banner">Live data from NOAA Space Weather Prediction Center. The satellite risk rating below is a simple rule of thumb made for this demo, not an official forecast. For real warnings see swpc.noaa.gov.</div>
+
+<div id="risk">Loading...<div id="riskWhy"></div></div>
+
+<div class="grid">
+  <div class="card"><h3>🧲 Geomagnetic storm (G)</h3><div class="big" id="gVal">-</div><div class="small" id="gTxt"></div></div>
+  <div class="card"><h3>☢️ Solar radiation storm (S)</h3><div class="big" id="sVal">-</div><div class="small" id="sTxt"></div></div>
+  <div class="card"><h3>📻 Radio blackout (R)</h3><div class="big" id="rVal">-</div><div class="small" id="rTxt"></div></div>
+  <div class="card"><h3>🌡 Kp index (latest)</h3><div class="big" id="kpVal">-</div><div class="small" id="kpTxt"></div></div>
+  <div class="card"><h3>💥 Solar flare now</h3><div class="big" id="flVal">-</div><div class="small" id="flTxt"></div></div>
+  <div class="card"><h3>🌬 Solar wind speed</h3><div class="big" id="wVal">-</div><div class="small" id="wTxt"></div></div>
+</div>
+
+<h2>Kp index (last 3 days)</h2>
+<canvas id="kpChart" width="700" height="240"></canvas>
+<p class="small">Kp 5 or higher means a geomagnetic storm. Storms can increase drag on low satellites and disturb GPS and radio.</p>
+
+<h2>Solar X-ray flux (last 6 hours)</h2>
+<canvas id="xrChart" width="700" height="260"></canvas>
+<p class="small">Flare classes from weakest to strongest: A, B, C, M, X. M and X flares can cause radio blackouts.</p>
+
+<h2>Latest NOAA alerts and warnings</h2>
+<div class="alerts" id="alerts">Loading...</div>
+
+<button id="refresh">🔄 Refresh now</button>
+<p id="status"></p>
+<p><a href="/index.html">← Back to Sky Explorer</a></p>
+
+<script>
+const BASE = 'https://services.swpc.noaa.gov';
+const LEVEL_COLORS = ['#7dff9b', '#ffe04a', '#ffc04a', '#ff9a3c', '#ff6a3c', '#ff4d4d'];
+const state = { g: 0, s: 0, r: 0, kp: null, flare: '', wind: null };
+
+async function getJSON(path) {
+  const r = await fetch(BASE + path, { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+function $(id) { return document.getElementById(id); }
+function setCard(id, value, text, color) {
+  $(id + 'Val').textContent = value;
+  if (color) $(id + 'Val').style.color = color;
+  $(id + 'Txt').textContent = text || '';
+}
+
+// ---------- G / S / R scales ----------
+function renderScales(d) {
+  const cur = d['0'];
+  if (!cur) throw new Error('no current scales');
+  [['G', 'g'], ['S', 's'], ['R', 'r']].forEach(([L, k]) => {
+    const item = cur[L] || {};
+    const n = parseInt(item.Scale, 10) || 0;
+    state[k] = n;
+    setCard(k, L + n, item.Text || 'none', LEVEL_COLORS[Math.min(n, 5)]);
+  });
+}
+
+// ---------- Kp index ----------
+function parseKp(d) {
+  if (!Array.isArray(d) || !d.length) return [];
+  if (Array.isArray(d[0])) {            // old format: first row is a header
+    return d.slice(1).map(r => ({ t: r[0], kp: parseFloat(r[1]) })).filter(p => !isNaN(p.kp));
+  }
+  return d.map(o => ({ t: o.time_tag, kp: parseFloat(o.Kp !== undefined ? o.Kp : o.kp_index) })).filter(p => !isNaN(p.kp));
+}
+function kpColor(k) { return k >= 7 ? '#ff4d4d' : k >= 5 ? '#ff9a3c' : k >= 4 ? '#ffe04a' : '#7dff9b'; }
+function kpWord(k) { return k >= 7 ? 'Strong storm' : k >= 5 ? 'Geomagnetic storm' : k >= 4 ? 'Active' : 'Quiet'; }
+
+function renderKp(d) {
+  const pts = parseKp(d);
+  if (!pts.length) throw new Error('no Kp data');
+  const last = pts[pts.length - 1];
+  state.kp = last.kp;
+  setCard('kp', last.kp.toFixed(1), kpWord(last.kp) + ' | ' + last.t, kpColor(last.kp));
+
+  const c = $('kpChart'), x = c.getContext('2d'), w = c.width, h = c.height;
+  x.clearRect(0, 0, w, h);
+  const L = 40, B = h - 25, T = 10, shown = pts.slice(-24);
+  const bw = (w - L - 10) / shown.length;
+  x.font = '11px Arial'; x.strokeStyle = '#1b2850'; x.fillStyle = '#8a9acc';
+  for (let k = 0; k <= 9; k += 3) {
+    const y = B - (B - T) * k / 9;
+    x.beginPath(); x.moveTo(L, y); x.lineTo(w - 10, y); x.stroke();
+    x.fillText(k, 15, y + 4);
+  }
+  shown.forEach((p, i) => {
+    const bh = (B - T) * Math.min(p.kp, 9) / 9;
+    x.fillStyle = kpColor(p.kp);
+    x.fillRect(L + i * bw + 2, B - bh, bw - 4, bh);
+    if (i % 4 === 0) {
+      x.fillStyle = '#8a9acc';
+      x.fillText(String(p.t).slice(5, 13).replace('T', ' ').replace(' ', ' '), L + i * bw, h - 8);
+    }
+  });
+}
+
+// ---------- X-ray flares ----------
+function flareClass(f) {
+  if (!(f > 0)) return '-';
+  const c = f >= 1e-4 ? ['X', 1e-4] : f >= 1e-5 ? ['M', 1e-5] : f >= 1e-6 ? ['C', 1e-6] : f >= 1e-7 ? ['B', 1e-7] : ['A', 1e-8];
+  return c[0] + (f / c[1]).toFixed(1);
+}
+function renderXray(d) {
+  let pts = (Array.isArray(d) ? d : []).filter(p => p.energy === '0.1-0.8nm');
+  if (!pts.length) pts = Array.isArray(d) ? d : [];
+  pts = pts.map(p => ({ t: p.time_tag, f: parseFloat(p.flux) })).filter(p => p.f > 0);
+  if (!pts.length) throw new Error('no X-ray data');
+  const last = pts[pts.length - 1];
+  const cls = flareClass(last.f);
+  state.flare = cls[0];
+  const col = cls[0] === 'X' ? '#ff4d4d' : cls[0] === 'M' ? '#ff9a3c' : cls[0] === 'C' ? '#ffe04a' : '#7dff9b';
+  setCard('fl', cls, 'X-ray flux ' + last.f.toExponential(1) + ' W/m²', col);
+
+  const c = $('xrChart'), x = c.getContext('2d'), w = c.width, h = c.height;
+  x.clearRect(0, 0, w, h);
+  const L = 50, R = w - 15, T = 10, B = h - 25;
+  const yOf = f => B - (B - T) * (Math.log10(Math.max(f, 1e-9)) + 9) / 6;   // 1e-9 .. 1e-3
+  x.font = '11px Arial'; x.strokeStyle = '#1b2850';
+  [[1e-7, 'B'], [1e-6, 'C'], [1e-5, 'M'], [1e-4, 'X']].forEach(([v, name]) => {
+    x.beginPath(); x.moveTo(L, yOf(v)); x.lineTo(R, yOf(v)); x.stroke();
+    x.fillStyle = '#8a9acc'; x.fillText(name, 20, yOf(v) + 4);
+  });
+  const t0 = new Date(pts[0].t).getTime(), t1 = new Date(last.t).getTime();
+  x.strokeStyle = '#61d9ff'; x.lineWidth = 1.5; x.beginPath();
+  pts.forEach((p, i) => {
+    const px = L + (R - L) * (new Date(p.t).getTime() - t0) / ((t1 - t0) || 1);
+    i ? x.lineTo(px, yOf(p.f)) : x.moveTo(px, yOf(p.f));
+  });
+  x.stroke(); x.lineWidth = 1;
+  x.fillStyle = '#8a9acc';
+  x.fillText(String(pts[0].t).slice(11, 16) + ' UTC', L, h - 8);
+  x.fillText(String(last.t).slice(11, 16) + ' UTC', R - 55, h - 8);
+}
+
+// ---------- Solar wind ----------
+function renderWind(d) {
+  const item = Array.isArray(d) ? d[d.length - 1] : d;
+  const v = parseFloat(item && (item.WindSpeed !== undefined ? item.WindSpeed : item.proton_speed));
+  if (isNaN(v)) throw new Error('no wind data');
+  state.wind = v;
+  const col = v >= 700 ? '#ff4d4d' : v >= 500 ? '#ff9a3c' : '#7dff9b';
+  setCard('w', Math.round(v), 'km/s (calm is about 300-450)', col);
+}
+
+// ---------- Alerts ----------
+function renderAlerts(d) {
+  const box = $('alerts');
+  box.innerHTML = '';
+  const list = (Array.isArray(d) ? d : []).slice(0, 6);
+  if (!list.length) { box.textContent = 'No recent alerts.'; return; }
+  list.forEach(a => {
+    const lines = String(a.message || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const key = lines.filter(l => /^(ALERT|WARNING|WATCH|SUMMARY|EXTENDED WARNING|CONTINUED ALERT|CANCEL)/i.test(l));
+    const text = (key.length ? key : lines.slice(0, 2)).slice(0, 3).join(' | ');
+    const div = document.createElement('div');
+    div.className = 'alert';
+    const b = document.createElement('b');
+    b.textContent = a.issue_datetime || '';
+    div.appendChild(b);
+    div.appendChild(document.createElement('br'));
+    div.appendChild(document.createTextNode(text));
+    box.appendChild(div);
+  });
+}
+
+// ---------- Satellite risk (simple rule of thumb) ----------
+function renderRisk() {
+  const reasons = [];
+  let level = 0;
+  const bump = (n, why) => { level = Math.max(level, n); reasons.push(why); };
+  if (state.g >= 3 || state.s >= 3 || state.r >= 3 || state.flare === 'X') bump(2, 'strong storm activity (G/S/R level 3+ or an X-class flare)');
+  if (state.g >= 1) bump(1, 'geomagnetic storm G' + state.g);
+  if (state.s >= 1) bump(1, 'solar radiation storm S' + state.s);
+  if (state.r >= 1) bump(1, 'radio blackout R' + state.r);
+  if (state.kp !== null && state.kp >= 5) bump(1, 'Kp index is ' + state.kp.toFixed(1));
+  if (state.flare === 'M') bump(1, 'M-class solar flare');
+  if (state.wind !== null && state.wind >= 600) bump(1, 'fast solar wind (' + Math.round(state.wind) + ' km/s)');
+  const names = ['LOW', 'ELEVATED', 'HIGH'], cols = ['#7dff9b', '#ffc04a', '#ff4d4d'];
+  const box = $('risk');
+  box.firstChild.textContent = '🛰 Satellite risk: ' + names[level];
+  box.style.color = cols[level];
+  box.style.borderColor = cols[level];
+  $('riskWhy').textContent = reasons.length ? 'Because: ' + reasons.join(', ') : 'Space weather is calm right now.';
+}
+
+// ---------- Load everything ----------
+async function loadAll() {
+  $('status').textContent = 'Updating...';
+  const jobs = [
+    ['/products/noaa-scales.json', renderScales, 'storm scales'],
+    ['/products/noaa-planetary-k-index.json', renderKp, 'Kp index'],
+    ['/json/goes/primary/xrays-6-hour.json', renderXray, 'X-ray flux'],
+    ['/products/summary/solar-wind-speed.json', renderWind, 'solar wind'],
+    ['/products/alerts.json', renderAlerts, 'alerts']
+  ];
+  const errors = [];
+  await Promise.all(jobs.map(async ([path, fn, name]) => {
+    try { fn(await getJSON(path)); }
+    catch (e) { errors.push(name + ' (' + e.message + ')'); console.error(name, e); }
+  }));
+  renderRisk();
+  $('status').textContent = errors.length
+    ? 'Could not load: ' + errors.join(', ')
+    : 'Updated ' + new Date().toLocaleTimeString() + ' | refreshes every minute';
+}
+
+$('refresh').addEventListener('click', loadAll);
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
+<script src="/theme.js"></script>

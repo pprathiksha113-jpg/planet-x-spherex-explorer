@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planet X Gravity Simulator</title>
+<style>
+  body { margin:0; padding:20px; font-family:Arial,sans-serif; background:#080d25; color:white; text-align:center; }
+  h1 { color:#61d9ff; } h2 { color:#f5c86b; }
+  p, label { color:#d0d8ef; }
+  canvas { background:#050818; border-radius:12px; max-width:100%; }
+  .controls { display:flex; flex-wrap:wrap; justify-content:center; gap:20px; margin:15px 0; }
+  .controls label { display:block; min-width:200px; }
+  input[type=range] { width:100%; }
+  button { background:#087cf0; color:white; padding:10px 22px; border:none; border-radius:8px; cursor:pointer; font-size:15px; margin:4px; }
+  button:disabled { opacity:0.6; cursor:default; }
+  button.preset { background:#6b3fd1; }
+  button.pause { background:#d98a00; }
+  table { margin:15px auto; border-collapse:collapse; max-width:100%; }
+  th, td { border:1px solid #2a3a6a; padding:8px 12px; }
+  th { background:#172448; color:#61d9ff; }
+  tbody tr { cursor:pointer; user-select:none; }
+  tbody tr:hover { background:#1c2c5a; }
+  tbody tr.sel { background:#27407a; }
+  .banner { max-width:800px; margin:10px auto; padding:10px 14px; border:1px solid #f5c86b; border-radius:8px; background:#2a2310; color:#f5c86b; font-size:14px; }
+  .note { max-width:800px; margin:15px auto; font-size:14px; color:#f5c86b; }
+  #info { max-width:520px; margin:15px auto; padding:14px 18px; background:#101b39; border-left:4px solid #61d9ff; border-radius:10px; text-align:left; }
+  #info h3 { margin:0 0 8px; color:#61d9ff; }
+  #info p { margin:3px 0; font-size:14px; }
+  a { color:#61d9ff; }
+</style>
+</head>
+<body>
+
+<nav style="text-align:center;padding:10px;background:#172448;border-radius:8px;margin-bottom:15px;font-family:Arial,sans-serif;">
+  <a href="/index.html#explorer" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🔭 Sky Explorer</a>
+  <a href="/index.html#moving" style="margin:0 15px;color:#61d9ff;text-decoration:none;">☄️ Moving Objects</a>
+  <a href="/simulator.html" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🪐 Planet X Simulator</a>
+  <a href="/tracker.html" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🛰 Satellite Tracker</a>
+  <a href="/spaceweather.html" style="margin:0 15px;color:#61d9ff;text-decoration:none;">☀️ Space Weather</a>
+</nav>
+
+<h1>🪐 Planet X Gravity Simulator</h1>
+<div class="banner">⚠️ Hypothetical scientific model — not proof that Planet X exists.</div>
+<p>Hollow dots = distant objects <b>without</b> Planet X. Solid dots with trails = <b>with</b> Planet X. The red dot is Planet X, the yellow dot is the Sun.</p>
+
+<div>
+  <button class="preset" id="pWeak">Weak Planet X (5 Earth masses, 400 AU)</button>
+  <button class="preset" id="pStrong">Strong Planet X (15 Earth masses, 300 AU)</button>
+  <button class="preset" id="pDefault">Default</button>
+</div>
+
+<div class="controls">
+  <label>Planet X mass: <b id="massVal">5</b> Earth masses
+    <input type="range" id="mass" min="1" max="20" step="1" value="5"></label>
+  <label>Semi-major axis: <b id="distVal">400</b> AU
+    <input type="range" id="dist" min="200" max="800" step="20" value="400"></label>
+  <label>Eccentricity: <b id="eccVal">0.30</b>
+    <input type="range" id="ecc" min="0" max="0.6" step="0.05" value="0.3"></label>
+  <label>Speed: <b id="speedVal">100</b> years/frame
+    <input type="range" id="speed" min="10" max="300" step="10" value="100"></label>
+  <label>Planet X inclination: <b id="inclVal">0</b>° (3D view only)
+    <input type="range" id="incl" min="0" max="60" step="5" value="0"></label>
+</div>
+<button id="reset">Reset</button>
+<button class="pause" id="pause">⏸ Pause</button>
+<button id="share">🔗 Copy share link</button>
+<button id="toggle3d">🧊 Show 3D view</button>
+<br>
+<button id="live">🛰 Update from NASA JPL</button> <span id="liveStatus" style="color:#f5c86b"></span>
+<p>Time elapsed: <b id="years">0</b> years &nbsp;|&nbsp; Planet X distance: <b id="xdist">0</b> AU</p>
+
+<canvas id="c" width="600" height="600"></canvas>
+<div id="three" style="display:none;width:600px;height:600px;max-width:100%;margin:10px auto"></div>
+<p id="note3d" style="display:none;font-size:13px;color:#f5c86b">3D view is visual only: the physics is still 2D. Each object is lifted out of the plane using its inclination and node, and the Planet X inclination slider only tilts Planet X's drawn orbit. It does not change the forces. Drag to rotate, pinch or scroll to zoom.</p>
+
+<h2>Perihelion angle shift (ϖ with Planet X − ϖ without)</h2>
+<canvas id="chart" width="700" height="260"></canvas>
+
+<h2>Comparison with observed orbits</h2>
+<p>Click a row to see that object's NASA data.</p>
+<div id="info"></div>
+<table>
+  <thead><tr><th>Object</th><th>Observed perihelion (AU)</th><th>Now, no Planet X</th><th>Now, with Planet X</th><th>Shift (AU)</th><th>Δϖ (°)</th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<p class="note">This is a scientific model, not proof that Planet X exists. Orbital elements are from the NASA JPL Small-Body Database (epoch 9 Jun 2026), accessed 15 Nov 2026. The starting position of each object on its orbit is illustrative. The radius is drawn on a square-root scale so close and far objects both fit. The physics is 2D (inclination ignored); the 3D view is visual only.</p>
+<p><a href="/index.html">← Back to Sky Explorer</a></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+const MU = 4 * Math.PI * Math.PI;
+const EARTH = 3.003e-6;
+
+// Real values from NASA JPL Small-Body Database. w = node + peri (mod 360)
+const OBJECTS = [
+  { name: 'Sedna',      a: 525,    e: 0.855,  w: 95.6,   i: 11.93, node: 144.3,  peri: 311.3,  note: 'Values approximate (published sources)' },
+  { name: '2012 VP113', a: 267.52, e: 0.6986, w: 25.18,  i: 24.00, node: 90.89,  peri: 294.29, note: 'NASA JPL SBDB, epoch 9 Jun 2026' },
+  { name: '2004 VN112', a: 342.15, e: 0.8615, w: 33.32,  i: 25.51, node: 66.04,  peri: 327.28, note: 'NASA JPL SBDB, epoch 9 Jun 2026' },
+  { name: '2010 GB174', a: 360.24, e: 0.8653, w: 117.99, i: 21.54, node: 130.57, peri: 347.42, note: 'NASA JPL SBDB, epoch 9 Jun 2026' },
+  { name: '2013 SY99',  a: 812.89, e: 0.9386, w: 61.79,  i: 4.23,  node: 29.51,  peri: 32.28,  note: 'NASA JPL SBDB, epoch 9 Jun 2026' },
+];
+OBJECTS.forEach(o => o.q = o.a * (1 - o.e));
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, CX = W / 2, CY = W / 2;
+const K = (W / 2 - 12) / Math.sqrt(1700);
+
+const chart = document.getElementById('chart');
+const cctx = chart.getContext('2d');
+
+const massEl = document.getElementById('mass');
+const distEl = document.getElementById('dist');
+const eccEl = document.getElementById('ecc');
+const speedEl = document.getElementById('speed');
+const inclEl = document.getElementById('incl');
+
+// Planet X tilt for the 3D view only (node = 0)
+const xObj = () => ({ node: 0, i: +inclEl.value });
+
+let paused = false;
+let selected = 0;
+
+function makeSystem(withX) {
+  const m = withX ? +massEl.value * EARTH : 0;
+  const a = +distEl.value, e = +eccEl.value;
+  const rX = a * (1 + e);                            // start at aphelion
+  const v = Math.sqrt(MU * (1 - e) / (a * (1 + e))); // vis-viva at aphelion
+  const ang = 200 * Math.PI / 180;
+  const X = { x: rX * Math.cos(ang), y: rX * Math.sin(ang), vx: -v * Math.sin(ang), vy: v * Math.cos(ang), m: m };
+  const sun = { x: -m * X.x, y: -m * X.y, vx: -m * X.vx, vy: -m * X.vy, m: 1 };
+  const ps = OBJECTS.map(o => {
+    const th = o.w * Math.PI / 180;
+    const sp = Math.sqrt(MU * (1 + o.e) / o.q);
+    return { x: o.q * Math.cos(th) + sun.x, y: o.q * Math.sin(th) + sun.y,
+             vx: -sp * Math.sin(th) + sun.vx, vy: sp * Math.cos(th) + sun.vy };
+  });
+  return { sun, X, ps };
+}
+
+function step(s, dt) {
+  const bodies = [s.sun, s.X];
+  const accel = p => {
+    let ax = 0, ay = 0;
+    for (const b of bodies) {
+      if (b === p) continue;
+      const dx = b.x - p.x, dy = b.y - p.y;
+      const r2 = dx * dx + dy * dy;
+      const g = MU * b.m / (r2 * Math.sqrt(r2));
+      ax += g * dx; ay += g * dy;
+    }
+    return [ax, ay];
+  };
+  const all = [s.sun, s.X, ...s.ps];
+  for (const p of all) { const [ax, ay] = accel(p); p.vx += ax * dt / 2; p.vy += ay * dt / 2; }
+  for (const p of all) { p.x += p.vx * dt; p.y += p.vy * dt; }
+  for (const p of all) { const [ax, ay] = accel(p); p.vx += ax * dt / 2; p.vy += ay * dt / 2; }
+}
+
+function elements(s, p) {
+  const x = p.x - s.sun.x, y = p.y - s.sun.y;
+  const vx = p.vx - s.sun.vx, vy = p.vy - s.sun.vy;
+  const r = Math.hypot(x, y);
+  const E = (vx * vx + vy * vy) / 2 - MU / r;
+  if (E >= 0) return null;
+  const h = x * vy - y * vx;
+  const a = -MU / (2 * E);
+  const e = Math.sqrt(Math.max(0, 1 + 2 * E * h * h / (MU * MU)));
+  return { a: a, e: e, q: a * (1 - e) };
+}
+
+// Perihelion angle (deg) from the Laplace-Runge-Lenz vector
+function varpi(s, p) {
+  const x = p.x - s.sun.x, y = p.y - s.sun.y;
+  const vx = p.vx - s.sun.vx, vy = p.vy - s.sun.vy;
+  const r = Math.hypot(x, y);
+  const v2 = vx * vx + vy * vy, rv = x * vx + y * vy;
+  const ex = (v2 - MU / r) * x - rv * vx;
+  const ey = (v2 - MU / r) * y - rv * vy;
+  return Math.atan2(ey, ex) * 180 / Math.PI;
+}
+function wrap(d) { while (d > 180) d -= 360; while (d < -180) d += 360; return d; }
+
+function toScreen(s, b) {
+  const x = b.x - s.sun.x, y = b.y - s.sun.y;
+  const r = Math.hypot(x, y) || 1e-9;
+  const rd = K * Math.sqrt(r);
+  return [CX + rd * x / r, CY - rd * y / r];
+}
+
+// ---------- 3D VIEW (visual only) ----------
+const COLORS = ['#61d9ff', '#7dff9b', '#ffb86b', '#ff7de9', '#c9a7ff'];
+const D2R = Math.PI / 180, K3 = 10 / Math.sqrt(1700);
+let is3d = false, scene, cam, rend, ctl, xDot, xLine;
+let dots = [], lines = [];
+let trail3 = OBJECTS.map(() => []);
+let trailX3 = [];
+
+function to3D(s, p, o) {
+  const x = p.x - s.sun.x, y = p.y - s.sun.y;
+  const r = Math.hypot(x, y) || 1e-9;
+  let X = x / r, Y = y / r, Z = 0;
+  if (o) {
+    const om = o.node * D2R, inc = o.i * D2R, u = Math.atan2(y, x) - om;
+    X = Math.cos(om) * Math.cos(u) - Math.sin(om) * Math.cos(inc) * Math.sin(u);
+    Y = Math.sin(om) * Math.cos(u) + Math.cos(om) * Math.cos(inc) * Math.sin(u);
+    Z = Math.sin(inc) * Math.sin(u);
+  }
+  const rd = K3 * Math.sqrt(r);
+  return new THREE.Vector3(rd * X, rd * Z, -rd * Y);
+}
+
+function init3D() {
+  const box = document.getElementById('three');
+  scene = new THREE.Scene();
+  cam = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+  cam.position.set(0, 12, 16);
+  rend = new THREE.WebGLRenderer({ antialias: true });
+  rend.setSize(600, 600);
+  rend.domElement.style.maxWidth = '100%';
+  rend.domElement.style.borderRadius = '12px';
+  rend.setClearColor(0x050818);
+  box.appendChild(rend.domElement);
+  ctl = new THREE.OrbitControls(cam, rend.domElement);
+  scene.add(new THREE.GridHelper(20, 20, 0x1b2850, 0x1b2850));
+  const ball = (c, s) => new THREE.Mesh(new THREE.SphereGeometry(s, 16, 16), new THREE.MeshBasicMaterial({ color: c }));
+  scene.add(ball(0xffd84a, 0.25));
+  xDot = ball(0xff4d4d, 0.2); scene.add(xDot);
+  xLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xff4d4d }));
+  xLine.frustumCulled = false;
+  scene.add(xLine);
+  OBJECTS.forEach((o, i) => {
+    const d = ball(COLORS[i], 0.12); scene.add(d); dots.push(d);
+    const ln = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: COLORS[i] }));
+    ln.frustumCulled = false;
+    scene.add(ln); lines.push(ln);
+  });
+}
+
+function update3D() {
+  withX.ps.forEach((p, i) => dots[i].position.copy(to3D(withX, p, OBJECTS[i])));
+  xDot.position.copy(to3D(withX, withX.X, xObj()));
+  xLine.geometry.setFromPoints(trailX3);
+  lines.forEach((ln, i) => ln.geometry.setFromPoints(trail3[i]));
+  ctl.update();
+  rend.render(scene, cam);
+}
+
+document.getElementById('toggle3d').addEventListener('click', () => {
+  if (typeof THREE === 'undefined') { alert('Three.js failed to load. Check your internet connection.'); return; }
+  is3d = !is3d;
+  if (is3d && !scene) init3D();
+  document.getElementById('three').style.display = is3d ? 'block' : 'none';
+  document.getElementById('note3d').style.display = is3d ? 'block' : 'none';
+  document.getElementById('c').style.display = is3d ? 'none' : 'inline-block';
+  document.getElementById('toggle3d').textContent = is3d ? '🌐 Show 2D view' : '🧊 Show 3D view';
+});
+
+// ---------- SYSTEM STATE ----------
+let withX, noX, trails, hist, years;
+function reset() {
+  withX = makeSystem(true);
+  noX = makeSystem(false);
+  trails = OBJECTS.map(() => []);
+  hist = OBJECTS.map(() => []);
+  trail3 = OBJECTS.map(() => []);
+  trailX3 = [];
+  years = 0;
+  document.getElementById('massVal').textContent = massEl.value;
+  document.getElementById('distVal').textContent = distEl.value;
+  document.getElementById('eccVal').textContent = (+eccEl.value).toFixed(2);
+  document.getElementById('speedVal').textContent = speedEl.value;
+  document.getElementById('inclVal').textContent = inclEl.value;
+}
+
+function applyPreset(m, d, e) {
+  massEl.value = m;
+  distEl.value = d;
+  eccEl.value = e;
+  reset();
+}
+
+function showInfo(i) {
+  const o = OBJECTS[i];
+  const Q = o.a * (1 + o.e);
+  const period = Math.pow(o.a, 1.5);
+  document.getElementById('info').innerHTML =
+    '<h3>' + o.name + '</h3>' +
+    '<p>Semi-major axis (a): <b>' + o.a + ' AU</b></p>' +
+    '<p>Eccentricity (e): <b>' + o.e + '</b></p>' +
+    '<p>Perihelion distance: <b>' + o.q.toFixed(1) + ' AU</b> &nbsp; Aphelion: <b>' + Q.toFixed(0) + ' AU</b></p>' +
+    '<p>Inclination: <b>' + o.i + '°</b> &nbsp; Node: <b>' + o.node + '°</b> &nbsp; Peri: <b>' + o.peri + '°</b></p>' +
+    '<p>Longitude of perihelion (node + peri): <b>' + o.w + '°</b></p>' +
+    '<p>Orbital period: about <b>' + Math.round(period).toLocaleString() + ' years</b></p>' +
+    '<p style="color:#f5c86b">Source: ' + o.note + '</p>';
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, W);
+  ctx.font = '11px Arial';
+  [30, 100, 300, 1000, 1600].forEach(r => {
+    const rd = K * Math.sqrt(r);
+    ctx.strokeStyle = '#1b2850';
+    ctx.beginPath(); ctx.arc(CX, CY, rd, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#4a5c90';
+    ctx.fillText(r + ' AU', CX + rd - 38, CY - 4);
+  });
+  trails.forEach((tr, i) => {
+    ctx.strokeStyle = COLORS[i]; ctx.globalAlpha = (i === selected) ? 0.95 : 0.5;
+    ctx.lineWidth = (i === selected) ? 2 : 1;
+    ctx.beginPath();
+    tr.forEach((pt, j) => j ? ctx.lineTo(pt[0], pt[1]) : ctx.moveTo(pt[0], pt[1]));
+    ctx.stroke(); ctx.globalAlpha = 1; ctx.lineWidth = 1;
+  });
+  noX.ps.forEach((p, i) => {
+    const [x, y] = toScreen(noX, p);
+    ctx.strokeStyle = COLORS[i]; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+  });
+  withX.ps.forEach((p, i) => {
+    const [x, y] = toScreen(withX, p);
+    ctx.fillStyle = COLORS[i];
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+    ctx.fillText(OBJECTS[i].name, x + 8, y - 6);
+  });
+  ctx.fillStyle = '#ffd84a';
+  ctx.beginPath(); ctx.arc(CX, CY, 7, 0, 7); ctx.fill();
+  const [px, py] = toScreen(withX, withX.X);
+  ctx.fillStyle = '#ff4d4d';
+  ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
+  ctx.fillText('Planet X', px + 9, py + 4);
+}
+
+function drawChart() {
+  const w = chart.width, h = chart.height;
+  const L = 50, R = w - 110, T = 15, B = h - 30;
+  cctx.clearRect(0, 0, w, h);
+  const n = hist[0].length;
+  let maxAbs = 5;
+  hist.forEach(hh => hh.forEach(pt => { maxAbs = Math.max(maxAbs, Math.abs(pt.d)); }));
+  maxAbs = Math.min(180, Math.ceil(maxAbs / 5) * 5);
+  const y = d => T + (B - T) * (1 - (d + maxAbs) / (2 * maxAbs));
+  cctx.font = '11px Arial'; cctx.fillStyle = '#8a9acc'; cctx.strokeStyle = '#1b2850';
+  [-maxAbs, 0, maxAbs].forEach(d => {
+    cctx.beginPath(); cctx.moveTo(L, y(d)); cctx.lineTo(R, y(d)); cctx.stroke();
+    cctx.fillText(d + '°', 8, y(d) + 4);
+  });
+  if (n < 2) return;
+  const t0 = hist[0][0].t, t1 = hist[0][n - 1].t;
+  const x = t => L + (R - L) * (t - t0) / ((t1 - t0) || 1);
+  cctx.fillText(t0.toLocaleString() + ' yr', L, h - 10);
+  cctx.fillText(t1.toLocaleString() + ' yr', R - 50, h - 10);
+  hist.forEach((hh, i) => {
+    cctx.strokeStyle = COLORS[i]; cctx.lineWidth = 1.5;
+    cctx.beginPath();
+    hh.forEach((pt, j) => j ? cctx.lineTo(x(pt.t), y(pt.d)) : cctx.moveTo(x(pt.t), y(pt.d)));
+    cctx.stroke();
+    cctx.fillStyle = COLORS[i];
+    cctx.fillText(OBJECTS[i].name, R + 8, T + 14 * (i + 1));
+  });
+  cctx.lineWidth = 1;
+}
+
+function updateTable() {
+  const rows = OBJECTS.map((o, i) => {
+    const a = elements(noX, noX.ps[i]);
+    const b = elements(withX, withX.ps[i]);
+    const qa = a ? a.q.toFixed(1) : 'escaped';
+    const qb = b ? b.q.toFixed(1) : 'escaped';
+    const shift = (a && b) ? (b.q - a.q).toFixed(2) : '-';
+    const dw = (a && b) ? wrap(varpi(withX, withX.ps[i]) - varpi(noX, noX.ps[i])).toFixed(1) : '-';
+    return '<tr data-i="' + i + '"' + (i === selected ? ' class="sel"' : '') + '><td>' + o.name + '</td><td>' + o.q.toFixed(1) + '</td><td>' + qa + '</td><td>' + qb + '</td><td>' + shift + '</td><td>' + dw + '</td></tr>';
+  });
+  document.getElementById('tbody').innerHTML = rows.join('');
+}
+
+let frame = 0;
+function loop() {
+  if (!paused) {
+    const n = +speedEl.value;
+    for (let i = 0; i < n; i++) {
+      step(withX, 1); step(noX, 1); years++;
+      if (years % 10 === 0) {
+        withX.ps.forEach((p, k) => {
+          trails[k].push(toScreen(withX, p));
+          if (trails[k].length > 1500) trails[k].shift();
+          trail3[k].push(to3D(withX, p, OBJECTS[k]));
+          if (trail3[k].length > 1500) trail3[k].shift();
+        });
+        trailX3.push(to3D(withX, withX.X, xObj()));
+        if (trailX3.length > 1500) trailX3.shift();
+      }
+      if (years % 20 === 0) {
+        withX.ps.forEach((p, k) => {
+          hist[k].push({ t: years, d: wrap(varpi(withX, p) - varpi(noX, noX.ps[k])) });
+          if (hist[k].length > 800) hist[k].shift();
+        });
+      }
+    }
+  }
+  draw();
+  if (is3d) update3D();
+  drawChart();
+  document.getElementById('years').textContent = years.toLocaleString();
+  document.getElementById('xdist').textContent = Math.round(Math.hypot(withX.X.x - withX.sun.x, withX.X.y - withX.sun.y));
+  if (frame++ % 10 === 0) updateTable();
+  requestAnimationFrame(loop);
+}
+
+// ---------- LIVE NASA JPL DATA ----------
+async function loadLive() {
+  const btn = document.getElementById('live'), st = document.getElementById('liveStatus');
+  btn.disabled = true; st.textContent = 'Fetching...';
+  try {
+    for (const o of OBJECTS) {
+      const r = await fetch('/api/jpl?name=' + encodeURIComponent(o.name));
+      const d = await r.json();
+      if (!d.success) throw new Error(o.name + ': ' + d.message);
+      Object.assign(o, { a: d.a, e: d.e, i: d.i, node: d.node, peri: d.peri });
+      o.w = ((d.node + d.peri) % 360 + 360) % 360;
+      o.q = o.a * (1 - o.e);
+      const date = new Date((d.epoch - 2440587.5) * 86400000).toISOString().slice(0, 10);
+      o.note = 'NASA JPL SBDB (live), epoch ' + date;
+    }
+    reset(); showInfo(selected);
+    st.textContent = '✅ Updated ' + new Date().toLocaleDateString();
+  } catch (e) { st.textContent = 'Error: ' + e.message; }
+  btn.disabled = false;
+}
+document.getElementById('live').addEventListener('click', loadLive);
+
+// ---------- SAVE & SHARE SETTINGS ----------
+const PARAMS = ['mass', 'dist', 'ecc', 'speed', 'incl'];
+function readURL() {
+  const q = new URLSearchParams(location.search);
+  PARAMS.forEach(k => { if (q.has(k)) document.getElementById(k).value = q.get(k); });
+}
+document.getElementById('share').addEventListener('click', async () => {
+  const btn = document.getElementById('share');
+  const q = new URLSearchParams();
+  PARAMS.forEach(k => q.set(k, document.getElementById(k).value));
+  history.replaceState(null, '', '?' + q);
+  const url = location.origin + location.pathname + '?' + q;
+  try { await navigator.clipboard.writeText(url); btn.textContent = '✅ Copied!'; }
+  catch (e) { prompt('Copy this link:', url); }
+  setTimeout(() => btn.textContent = '🔗 Copy share link', 1500);
+});
+
+// ---------- EVENTS ----------
+massEl.addEventListener('input', reset);
+distEl.addEventListener('input', reset);
+eccEl.addEventListener('input', reset);
+speedEl.addEventListener('input', () => document.getElementById('speedVal').textContent = speedEl.value);
+// Inclination is visual only: clear Planet X's 3D trail, keep the simulation running
+inclEl.addEventListener('input', () => {
+  document.getElementById('inclVal').textContent = inclEl.value;
+  trailX3 = [];
+});
+document.getElementById('reset').addEventListener('click', reset);
+
+document.getElementById('pause').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? '▶ Play' : '⏸ Pause';
+});
+document.getElementById('pWeak').addEventListener('click', () => applyPreset(5, 400, 0.3));
+document.getElementById('pStrong').addEventListener('click', () => applyPreset(15, 300, 0.3));
+document.getElementById('pDefault').addEventListener('click', () => applyPreset(5, 400, 0.3));
+
+// pointerdown fires immediately, so it still works while the table refreshes
+document.getElementById('tbody').addEventListener('pointerdown', e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  selected = +tr.dataset.i;
+  showInfo(selected);
+  updateTable();
+});
+
+readURL();
+reset();
+showInfo(0);
+loop();
+</script>
+<script src="/theme.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Satellite & Debris Tracker</title>
+<style>
+  body { margin:0; padding:20px; font-family:Arial,sans-serif; background:#080d25; color:white; text-align:center; }
+  h1 { color:#61d9ff; } h2 { color:#f5c86b; }
+  p, label { color:#d0d8ef; }
+  canvas { background:#050818; border-radius:12px; max-width:100%; cursor:crosshair; }
+  select { padding:8px; border-radius:6px; font-size:15px; margin:6px; }
+  button { background:#087cf0; color:white; padding:10px 22px; border:none; border-radius:8px; cursor:pointer; font-size:15px; margin:4px; }
+  .banner { max-width:800px; margin:10px auto; padding:10px 14px; border:1px solid #f5c86b; border-radius:8px; background:#2a2310; color:#f5c86b; font-size:14px; }
+  #info { max-width:520px; margin:15px auto; padding:14px 18px; background:#101b39; border-left:4px solid #61d9ff; border-radius:10px; text-align:left; }
+  #info h3 { margin:0 0 8px; color:#61d9ff; }
+  #info p { margin:3px 0; font-size:14px; }
+  .legend span { margin:0 10px; font-size:14px; }
+  a { color:#61d9ff; }
+</style>
+</head>
+<body>
+
+<nav style="text-align:center;padding:10px;background:#172448;border-radius:8px;margin-bottom:15px;">
+  <a href="/index.html#explorer" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🔭 Sky Explorer</a>
+  <a href="/index.html#moving" style="margin:0 15px;color:#61d9ff;text-decoration:none;">☄️ Moving Objects</a>
+  <a href="/simulator.html" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🪐 Planet X Simulator</a>
+  <a href="/tracker.html" style="margin:0 15px;color:#61d9ff;text-decoration:none;">🛰 Satellite Tracker</a>
+</nav>
+
+<h1>🛰 Satellite & Space Debris Tracker</h1>
+<div class="banner">Positions are calculated from public orbit data (CelesTrak / US Space Force catalog), not detected by a telescope. Accuracy is roughly a few kilometres.</div>
+
+<label>Group:
+  <select id="group">
+    <option value="stations">Space stations (ISS, Tiangong)</option>
+    <option value="visual">100 brightest satellites</option>
+    <option value="starlink">Starlink</option>
+    <option value="gps-ops">GPS</option>
+    <option value="cosmos-2251-debris">Debris: Cosmos 2251 collision</option>
+    <option value="iridium-33-debris">Debris: Iridium 33 collision</option>
+    <option value="1999-025">Debris: Fengyun-1C (2007 test)</option>
+    <option value="active">All active satellites (slow)</option>
+  </select>
+</label>
+<button id="reload">Reload data</button>
+<p id="status">Loading...</p>
+<p class="legend">
+  <span style="color:#7dff9b">● Below 2,000 km (LEO)</span>
+  <span style="color:#ffd84a">● 2,000–35,000 km</span>
+  <span style="color:#ff6b6b">● Above 35,000 km (GEO)</span>
+  <span style="color:#ffffff">◎ Selected</span>
+</p>
+
+<canvas id="map" width="900" height="450"></canvas>
+<p>Click a dot to see its details.</p>
+<div id="info"><p>No object selected.</p></div>
+
+<p><a href="/index.html">← Back to Sky Explorer</a></p>
+
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.4/dist/satellite.min.js"></script>
+<script>
+const canvas = document.getElementById('map');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const groupEl = document.getElementById('group');
+const statusEl = document.getElementById('status');
+
+let sats = [];        // { name, satrec }
+let points = [];      // current positions: { name, lat, lon, alt, speed, i }
+let selected = -1;
+
+function parseTLE(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const out = [];
+  for (let i = 0; i + 2 < lines.length; i += 3) {
+    if (!lines[i + 1].startsWith('1 ') || !lines[i + 2].startsWith('2 ')) continue;
+    try {
+      out.push({ name: lines[i].replace(/^0 /, ''), satrec: satellite.twoline2satrec(lines[i + 1], lines[i + 2]) });
+    } catch (e) { /* skip bad entry */ }
+  }
+  return out;
+}
+
+async function loadGroup() {
+  statusEl.textContent = 'Loading ' + groupEl.options[groupEl.selectedIndex].text + '...';
+  selected = -1;
+  document.getElementById('info').innerHTML = '<p>No object selected.</p>';
+  try {
+    const r = await fetch('/api/tle?group=' + encodeURIComponent(groupEl.value));
+    const text = await r.text();
+    if (!r.ok) {
+      let msg = 'Request failed';
+      try { msg = JSON.parse(text).message; } catch (e) {}
+      throw new Error(msg);
+    }
+    sats = parseTLE(text);
+    if (!sats.length) throw new Error('No objects found in the data');
+    update();
+  } catch (e) {
+    sats = []; points = [];
+    statusEl.textContent = 'Error: ' + e.message;
+    draw();
+  }
+}
+
+function update() {
+  const now = new Date();
+  const gmst = satellite.gstime(now);
+  points = [];
+  sats.forEach((s, i) => {
+    const pv = satellite.propagate(s.satrec, now);
+    if (!pv.position || !pv.velocity) return;
+    const gd = satellite.eciToGeodetic(pv.position, gmst);
+    const v = pv.velocity;
+    points.push({
+      name: s.name,
+      lat: satellite.degreesLat(gd.latitude),
+      lon: satellite.degreesLong(gd.longitude),
+      alt: gd.height,
+      speed: Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z),
+      i: i
+    });
+  });
+  statusEl.textContent = points.length.toLocaleString() + ' objects tracked | ' + now.toUTCString();
+  draw();
+  if (selected >= 0) showInfo();
+}
+
+function xy(p) { return [(p.lon + 180) / 360 * W, (90 - p.lat) / 180 * H]; }
+
+function color(alt) { return alt < 2000 ? '#7dff9b' : alt < 35000 ? '#ffd84a' : '#ff6b6b'; }
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#1b2850'; ctx.fillStyle = '#4a5c90'; ctx.font = '11px Arial';
+  for (let lon = -180; lon <= 180; lon += 30) {
+    const x = (lon + 180) / 360 * W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.fillText(lon + '°', x + 2, H - 4);
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const y = (90 - lat) / 180 * H;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillText(lat + '°', 2, y - 2);
+  }
+  const big = points.length < 300;
+  points.forEach(p => {
+    const [x, y] = xy(p);
+    ctx.fillStyle = color(p.alt);
+    ctx.beginPath(); ctx.arc(x, y, big ? 3 : 1.5, 0, 7); ctx.fill();
+    if (points.length < 20) { ctx.fillStyle = '#d0d8ef'; ctx.fillText(p.name, x + 6, y - 5); }
+  });
+  if (selected >= 0) {
+    const p = points.find(q => q.i === selected);
+    if (p) {
+      const [x, y] = xy(p);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.stroke(); ctx.lineWidth = 1;
+    }
+  }
+}
+
+function showInfo() {
+  const p = points.find(q => q.i === selected);
+  if (!p) return;
+  const period = 2 * Math.PI * Math.sqrt(Math.pow(6371 + p.alt, 3) / 398600.4418) / 60;
+  document.getElementById('info').innerHTML =
+    '<h3>' + p.name + '</h3>' +
+    '<p>Latitude: <b>' + p.lat.toFixed(2) + '°</b> &nbsp; Longitude: <b>' + p.lon.toFixed(2) + '°</b></p>' +
+    '<p>Altitude: <b>' + Math.round(p.alt).toLocaleString() + ' km</b></p>' +
+    '<p>Speed: <b>' + p.speed.toFixed(2) + ' km/s</b> (' + Math.round(p.speed * 3600).toLocaleString() + ' km/h)</p>' +
+    '<p>Approx. orbit time: <b>' + Math.round(period) + ' minutes</b></p>';
+}
+
+canvas.addEventListener('pointerdown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * W / rect.width;
+  const my = (e.clientY - rect.top) * H / rect.height;
+  let best = -1, bd = 15 * 15;
+  points.forEach(p => {
+    const [x, y] = xy(p);
+    const d = (x - mx) * (x - mx) + (y - my) * (y - my);
+    if (d < bd) { bd = d; best = p.i; }
+  });
+  if (best >= 0) { selected = best; showInfo(); draw(); }
+});
+
+groupEl.addEventListener('change', loadGroup);
+document.getElementById('reload').addEventListener('click', loadGroup);
+
+if (typeof satellite === 'undefined') {
+  statusEl.textContent = 'Error: satellite.js failed to load. Check your internet connection.';
+} else {
+  loadGroup();
+  setInterval(update, 1000);
+}
+</script>
+</body>
+</html>
+<script src="/theme.js"></script>
